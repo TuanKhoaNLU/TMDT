@@ -16,11 +16,11 @@ import java.util.List;
 import java.util.Map;
 
 @Service
-public class AdvancedMarketplaceService {
+public class MarketplaceModuleService {
 
     private final JdbcTemplate jdbcTemplate;
 
-    public AdvancedMarketplaceService(JdbcTemplate jdbcTemplate) {
+    public MarketplaceModuleService(JdbcTemplate jdbcTemplate) {
         this.jdbcTemplate = jdbcTemplate;
     }
 

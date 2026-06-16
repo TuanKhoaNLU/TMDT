@@ -29,12 +29,14 @@ npm -v
 Windows co the dung Maven wrapper:
 
 ```powershell
+cd backend
 .\mvnw.cmd -version
 ```
 
 macOS/Linux:
 
 ```bash
+cd backend
 ./mvnw -version
 ```
 
@@ -47,19 +49,21 @@ git clone <repo-url>
 cd TMDT
 ```
 
-2. Tao file cau hinh local:
+2. Tao file cau hinh local cho backend:
 
 ```bash
+cd backend
 cp .env.example .env
 ```
 
 Tren PowerShell:
 
 ```powershell
+cd backend
 Copy-Item .env.example .env
 ```
 
-3. Sua `.env` theo may local:
+3. Sua `backend/.env` theo may local:
 
 ```properties
 MYSQL_URL=jdbc:mysql://localhost:3306/e_commerce?createDatabaseIfNotExist=true&useUnicode=true&characterEncoding=utf8&serverTimezone=Asia/Ho_Chi_Minh&useSSL=false&allowPublicKeyRetrieval=true
@@ -103,17 +107,19 @@ Khong nen bat mock khi demo luong thanh toan that.
 
 ## Run Project
 
-Chay backend tu thu muc goc.
+Chay backend tu thu muc `backend`.
 
 Windows:
 
 ```powershell
+cd backend
 .\mvnw.cmd spring-boot:run
 ```
 
 macOS/Linux:
 
 ```bash
+cd backend
 ./mvnw spring-boot:run
 ```
 
@@ -123,7 +129,7 @@ Backend chay o:
 http://localhost:8080
 ```
 
-Chay frontend:
+Chay frontend tu thu muc `frontend`:
 
 ```bash
 cd frontend
@@ -248,6 +254,7 @@ Orders:
 Backend:
 
 ```bash
+cd backend
 ./mvnw clean package
 java -jar target/TMDT_CK-0.0.1-SNAPSHOT.jar
 ```
@@ -255,6 +262,7 @@ java -jar target/TMDT_CK-0.0.1-SNAPSHOT.jar
 Windows:
 
 ```powershell
+cd backend
 .\mvnw.cmd clean package
 java -jar target\TMDT_CK-0.0.1-SNAPSHOT.jar
 ```
@@ -269,21 +277,23 @@ npm run preview
 
 ## Before Pushing To GitHub
 
-Khong commit `.env` vi co token GHN/VNPay/MySQL. Repo da ignore `.env`, chi commit `.env.example`.
+Khong commit `backend/.env` vi co token GHN/VNPay/MySQL. Repo da ignore `backend/.env`, chi commit `backend/.env.example`.
 
 Nen chay truoc:
 
 ```bash
 git status --short
+cd backend
 ./mvnw -q -DskipTests compile
-cd frontend && npm run build
+cd ../frontend && npm run build
 ```
 
 Windows:
 
 ```powershell
 git status --short
+cd backend
 .\mvnw.cmd -q -DskipTests compile
-cd frontend
+cd ..\frontend
 npm run build
 ```

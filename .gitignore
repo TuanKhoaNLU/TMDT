@@ -1,9 +1,9 @@
-/target/
 /.idea/
 *.iml
 *.log
-.env
-.env.*
-!.env.example
+/backend/target/
+/backend/.env
+/backend/.env.*
+!/backend/.env.example
 /frontend/node_modules/
 /frontend/dist/

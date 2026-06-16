@@ -337,10 +337,10 @@ public class DatabaseInitializer implements ApplicationRunner {
                   `active` boolean DEFAULT true
                 )
                 """);
-        createAdvancedMarketplaceTables();
+        createMarketplaceModuleTables();
     }
 
-    private void createAdvancedMarketplaceTables() {
+    private void createMarketplaceModuleTables() {
         jdbcTemplate.execute("""
                 CREATE TABLE IF NOT EXISTS `vouchers` (
                   `id` bigint PRIMARY KEY,
@@ -673,10 +673,10 @@ public class DatabaseInitializer implements ApplicationRunner {
                 VALUES (1, 1, 'SYSTEM', 'Chao mung den TMDT Market', 'Theo doi shop va luu wishlist de ca nhan hoa trai nghiem mua handmade.', 'welcome-buyer')
                 ON DUPLICATE KEY UPDATE `title` = VALUES(`title`), `message` = VALUES(`message`)
                 """);
-        seedAdvancedDemoData();
+        seedMarketplaceModuleDemoData();
     }
 
-    private void seedAdvancedDemoData() {
+    private void seedMarketplaceModuleDemoData() {
         jdbcTemplate.update("""
                 INSERT INTO `vouchers` (`id`, `code`, `scope`, `shop_id`, `category_id`, `title`, `discount_percent`,
                   `max_discount_amount`, `min_order_amount`, `usage_limit`, `used_count`, `per_user_limit`, `active`, `end_at`)
