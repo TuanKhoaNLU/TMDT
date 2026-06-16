@@ -16,6 +16,9 @@ export default function CheckoutPage() {
   const [selectedProvinceId, setSelectedProvinceId] = useState("");
   const [selectedDistrictId, setSelectedDistrictId] = useState("");
   const [selectedWardCode, setSelectedWardCode] = useState("");
+  const [voucherCode, setVoucherCode] = useState("");
+  const [giftWrapTierId, setGiftWrapTierId] = useState("");
+  const [rewardPointsUsed, setRewardPointsUsed] = useState(0);
 
   const summaryQuery = useQuery({
     queryKey: ["checkout-summary", cart.totalQuantity, selectedDistrictId, selectedWardCode],
@@ -33,6 +36,7 @@ export default function CheckoutPage() {
     queryFn: () => marketplaceApi.wards(selectedDistrictId),
     enabled: !!selectedDistrictId
   });
+  const giftWrapTiers = useQuery({ queryKey: ["gift-wrap-tiers"], queryFn: marketplaceApi.giftWrapTiers });
 
   useEffect(() => {
     if (!cartLoading && !cart.shops.length) {
@@ -76,6 +80,10 @@ export default function CheckoutPage() {
       payload.provinceName = selectedProvince?.name || payload.province;
       payload.districtName = selectedDistrict?.name || payload.district;
       payload.wardName = selectedWard?.name || payload.ward;
+      payload.voucherCode = voucherCode;
+      payload.giftWrapTierId = giftWrapTierId || null;
+      payload.rewardPointsUsed = Number(rewardPointsUsed || 0);
+      payload.idempotencyKey = crypto.randomUUID ? crypto.randomUUID() : `${Date.now()}-${Math.random()}`;
       const order = await marketplaceApi.checkout(payload);
       await refreshCart();
 
@@ -170,6 +178,31 @@ export default function CheckoutPage() {
         </section>
 
         <section className="form-section">
+          <h2>Uu dai va qua tang</h2>
+          <label>
+            Voucher
+            <input name="voucherCodeInput" placeholder="HANDMADE10" value={voucherCode} onChange={(event) => setVoucherCode(event.target.value)} />
+          </label>
+          <label>
+            Goi qua
+            <select name="giftWrapTierIdInput" value={giftWrapTierId} onChange={(event) => setGiftWrapTierId(event.target.value)}>
+              <option value="">Khong chon goi qua</option>
+              {(giftWrapTiers.data || []).map((tier) => (
+                <option key={tier.id} value={tier.id}>{tier.name} - {formatMoney(tier.price)}</option>
+              ))}
+            </select>
+          </label>
+          <label>
+            Loi nhan qua tang
+            <input name="giftMessage" placeholder="Loi nhan tren thiep" />
+          </label>
+          <label>
+            Dung diem thuong
+            <input name="rewardPointsInput" type="number" min="0" value={rewardPointsUsed} onChange={(event) => setRewardPointsUsed(event.target.value)} />
+          </label>
+        </section>
+
+        <section className="form-section">
           <h2>Thanh toan</h2>
           <div className="payment-grid">
             <label>
@@ -214,6 +247,18 @@ export default function CheckoutPage() {
           <span>Phi ship</span>
           <strong>{formatMoney(summary?.shippingTotal)}</strong>
         </div>
+        {giftWrapTierId && (
+          <div className="summary-row">
+            <span>Goi qua</span>
+            <strong>{formatMoney((giftWrapTiers.data || []).find((tier) => String(tier.id) === String(giftWrapTierId))?.price)}</strong>
+          </div>
+        )}
+        {voucherCode && (
+          <div className="summary-row muted">
+            <span>Voucher</span>
+            <span>{voucherCode}</span>
+          </div>
+        )}
         <div className="summary-row total">
           <span>Tong</span>
           <strong>{formatMoney(summary?.grandTotal)}</strong>

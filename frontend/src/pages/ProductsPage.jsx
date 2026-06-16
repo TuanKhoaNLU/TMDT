@@ -1,5 +1,5 @@
 import { useQuery } from "@tanstack/react-query";
-import { AlertCircle, Loader2, Plus, RotateCcw, ShieldCheck, ShoppingCart, SlidersHorizontal, Store } from "lucide-react";
+import { AlertCircle, Loader2, Plus, RotateCcw, ShieldCheck, ShoppingCart, SlidersHorizontal, Sparkles, Store, Ticket } from "lucide-react";
 import { Link, useSearchParams } from "react-router-dom";
 import { useMemo } from "react";
 import { marketplaceApi } from "../api/marketplaceApi";
@@ -13,6 +13,10 @@ export default function ProductsPage() {
   const { data: products = [], isLoading, error } = useQuery({
     queryKey: ["products"],
     queryFn: marketplaceApi.products
+  });
+  const { data: homepage } = useQuery({
+    queryKey: ["homepage"],
+    queryFn: marketplaceApi.homepage
   });
 
   const keyword = (searchParams.get("q") || "").trim().toLowerCase();
@@ -64,6 +68,19 @@ export default function ProductsPage() {
 
   return (
     <div className="market-page">
+      {!!homepage?.banners?.length && (
+        <section className="home-hero" style={{ backgroundImage: `url(${homepage.banners[0].imageUrl})` }}>
+          <div>
+            <span className="section-kicker"><Sparkles size={16} /> Handmade marketplace</span>
+            <h1>{homepage.banners[0].title}</h1>
+            <p>{homepage.banners[0].subtitle}</p>
+            <Link className="btn primary" to={homepage.banners[0].linkUrl || "/"}>
+              Kham pha ngay
+            </Link>
+          </div>
+        </section>
+      )}
+
       <section className="market-overview">
         <div className="overview-copy">
           <span className="section-kicker">TMDT Marketplace</span>
@@ -85,6 +102,18 @@ export default function ProductsPage() {
           </div>
         </div>
       </section>
+
+      {!!homepage?.promotions?.length && (
+        <section className="promo-row">
+          {homepage.promotions.map((promo) => (
+            <article className="promo-tile" key={promo.code}>
+              <Ticket size={18} />
+              <strong>{promo.title}</strong>
+              <span>{promo.description}</span>
+            </article>
+          ))}
+        </section>
+      )}
 
       <div className="catalog-shell">
         <aside className="catalog-sidebar">
@@ -142,13 +171,15 @@ export default function ProductsPage() {
                 return (
                   <article className="product-card" key={product.id}>
                     <div className="img-wrapper">
-                      <img src={product.image} alt={product.name} />
+                      <Link to={`/products/${product.id}`}>
+                        <img src={product.image} alt={product.name} />
+                      </Link>
                       <span className="mall-tag">{product.customizable ? "Dat rieng" : "Co san"}</span>
                     </div>
                     <div className="product-body">
                       <div className="product-info">
-                        <p className="shop-name"><Store size={14} /> {product.shopName}</p>
-                        <h2>{product.name}</h2>
+                        <Link className="shop-name" to={`/shops/${product.shopId}`}><Store size={14} /> {product.shopName}</Link>
+                        <Link to={`/products/${product.id}`}><h2>{product.name}</h2></Link>
                         <p className="muted">{product.category}</p>
                       </div>
                       <div className="product-meta">

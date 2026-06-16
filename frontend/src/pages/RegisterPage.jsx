@@ -1,7 +1,6 @@
 import React, { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { PackageCheck, ShieldCheck, ShoppingCart } from 'lucide-react';
-import { useAuth } from '../context/AuthContext';
 import axiosInstance from '../api/axiosInstance';
 
 export default function RegisterPage() {
@@ -10,16 +9,15 @@ export default function RegisterPage() {
   const [email, setEmail] = useState('');
   const [fullName, setFullName] = useState('');
   const [error, setError] = useState('');
-  const { login } = useAuth();
   const navigate = useNavigate();
 
   const handleRegister = async (e) => {
     e.preventDefault();
     try {
       const response = await axiosInstance.post('/auth/register', { username, password, email, fullName });
-      const { token, ...userData } = response.data;
-      login(userData, token);
-      navigate('/');
+      localStorage.setItem('auth_token', response.data.token);
+      localStorage.setItem('auth_user', JSON.stringify(response.data));
+      navigate(`/verify-otp?email=${encodeURIComponent(email)}`);
     } catch (err) {
       setError(err.message || 'Registration failed.');
     }

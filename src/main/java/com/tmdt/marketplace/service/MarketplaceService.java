@@ -131,6 +131,308 @@ public class MarketplaceService {
         }
     }
 
+    public HomepageResponse getHomepage() {
+        try {
+            List<HomepageBanner> banners = jdbcTemplate.query("""
+                    SELECT `id`, `title`, `subtitle`, `image_url`, `link_url`
+                    FROM `homepage_banners`
+                    WHERE `active` = true
+                    ORDER BY `sort_order`, `id`
+                    """, (rs, rowNum) -> new HomepageBanner(
+                    rs.getLong("id"),
+                    rs.getString("title"),
+                    rs.getString("subtitle"),
+                    rs.getString("image_url"),
+                    rs.getString("link_url")
+            ));
+            List<CategorySummary> categories = jdbcTemplate.query("""
+                    SELECT c.`id`, c.`name`, c.`slug`, COALESCE(c.`status`, 'ACTIVE') AS status,
+                           COUNT(p.`id`) AS product_count
+                    FROM `Categories` c
+                    LEFT JOIN `Products` p ON p.`cat_id` = c.`id` AND p.`status` = 'active'
+                    GROUP BY c.`id`, c.`name`, c.`slug`, c.`status`
+                    ORDER BY c.`id`
+                    """, this::mapCategorySummary);
+            List<ProductCard> featured = jdbcTemplate.query(productSelectSql()
+                    + " WHERE p.`status` = 'active' ORDER BY p.`avg_rating` DESC, p.`id` LIMIT 8", this::mapProductCard);
+            List<ProductCard> bestSellers = jdbcTemplate.query(productSelectSql()
+                    + " WHERE p.`status` = 'active' ORDER BY COALESCE(inv.`stock`, 0) ASC, p.`id` LIMIT 8", this::mapProductCard);
+            List<PromotionCard> promotions = List.of(
+                    new PromotionCard("FLASH_DEMO", "Flash handmade", "Giam gia mau cho cac san pham co san", "Dang mo"),
+                    new PromotionCard("VOUCHER_DEMO", "Voucher shop", "Nhap ma tai checkout khi shop kich hoat voucher", "Sap co")
+            );
+            return new HomepageResponse(banners, categories, featured, bestSellers, promotions);
+        } catch (DataAccessException ex) {
+            List<ProductCard> products = fallbackProducts();
+            return new HomepageResponse(List.of(), List.of(), products, products, List.of());
+        }
+    }
+
+    public ProductDetailResponse getProductDetail(Long buyerIdHeader, Long productId) {
+        ProductCard product = findProductCard(productId).orElseThrow(() -> notFound("Khong tim thay san pham."));
+        try {
+            List<ReviewSummary> reviews = jdbcTemplate.query("""
+                    SELECT r.`id`, r.`rating`, r.`comment`, r.`seller_reply`, u.`full_name`, r.`created_at`
+                    FROM `product_reviews` r
+                    LEFT JOIN `Users` u ON u.`id` = r.`user_id`
+                    WHERE r.`product_id` = ?
+                    ORDER BY r.`created_at` DESC
+                    """, this::mapReviewSummary, productId);
+            List<QuestionSummary> questions = jdbcTemplate.query("""
+                    SELECT q.`id`, q.`question`, q.`answer`, COALESCE(u.`full_name`, 'Khach hang') AS asker_name,
+                           q.`status`, q.`created_at`, q.`answered_at`
+                    FROM `product_questions` q
+                    LEFT JOIN `Users` u ON u.`id` = q.`user_id`
+                    WHERE q.`product_id` = ? AND q.`status` = 'PUBLISHED'
+                    ORDER BY q.`created_at` DESC
+                    """, this::mapQuestionSummary, productId);
+            boolean wished = buyerIdHeader != null && exists("SELECT COUNT(*) FROM `wishlists` WHERE `user_id` = ? AND `product_id` = ?", buyerIdHeader, productId);
+            boolean followedShop = buyerIdHeader != null && exists("SELECT COUNT(*) FROM `shop_follows` WHERE `user_id` = ? AND `shop_id` = ?", buyerIdHeader, product.shopId());
+            List<ProductCard> related = jdbcTemplate.query(productSelectSql()
+                    + " WHERE p.`id` <> ? AND c.`name` = ? AND p.`status` = 'active' ORDER BY p.`id` LIMIT 4",
+                    this::mapProductCard, productId, product.category());
+            return new ProductDetailResponse(product, reviews, questions, wished, followedShop, related);
+        } catch (DataAccessException ex) {
+            throw serviceUnavailable();
+        }
+    }
+
+    public PublicShopResponse getPublicShop(Long buyerIdHeader, Long shopId) {
+        try {
+            ShopProfile shop = jdbcTemplate.queryForObject("""
+                    SELECT s.`id`, s.`shop_name`, COALESCE(s.`logo_url`, '') AS logo_url,
+                           COALESCE(s.`hero_url`, '') AS hero_url, COALESCE(s.`description`, '') AS description,
+                           COALESCE(s.`about`, '') AS about, COALESCE(s.`materials`, '') AS materials,
+                           COALESCE(s.`years_experience`, 1) AS years_experience,
+                           COALESCE(s.`verified_artisan`, false) AS verified_artisan,
+                           COALESCE(s.`rating`, 0) AS rating,
+                           (SELECT COUNT(*) FROM `shop_follows` f WHERE f.`shop_id` = s.`id`) AS follower_count
+                    FROM `Shops` s
+                    WHERE s.`id` = ?
+                    """, this::mapShopProfile, shopId);
+            List<ProductCard> products = jdbcTemplate.query(productSelectSql()
+                    + " WHERE p.`shop_id` = ? AND p.`status` = 'active' ORDER BY p.`id`", this::mapProductCard, shopId);
+            boolean followed = buyerIdHeader != null && exists("SELECT COUNT(*) FROM `shop_follows` WHERE `user_id` = ? AND `shop_id` = ?", buyerIdHeader, shopId);
+            return new PublicShopResponse(shop, products, followed);
+        } catch (EmptyResultDataAccessException ex) {
+            throw notFound("Khong tim thay shop.");
+        } catch (DataAccessException ex) {
+            throw serviceUnavailable();
+        }
+    }
+
+    public UserProfileResponse getProfile(Long userIdHeader) {
+        long userId = buyerIdOrDefault(userIdHeader);
+        try {
+            UserProfile profile = jdbcTemplate.queryForObject("""
+                    SELECT u.`id`, u.`full_name`, COALESCE(a.`email`, '') AS email, COALESCE(u.`phone`, '') AS phone,
+                           COALESCE(u.`address`, '') AS address, COALESCE(u.`reward_points`, 0) AS reward_points,
+                           COALESCE(u.`status`, 'ACTIVE') AS status, COALESCE(a.`role`, 'BUYER') AS role
+                    FROM `Users` u
+                    LEFT JOIN `Accounts` a ON a.`user_id` = u.`id`
+                    WHERE u.`id` = ?
+                    """, this::mapUserProfile, userId);
+            List<AddressSummary> addresses = jdbcTemplate.query("""
+                    SELECT `id`, `label`, `receiver_name`, `phone`, `province`, `district`, `ward`, `address`, `is_default`
+                    FROM `user_addresses`
+                    WHERE `user_id` = ?
+                    ORDER BY `is_default` DESC, `id`
+                    LIMIT 5
+                    """, this::mapAddressSummary, userId);
+            List<ProductCard> wishlist = getWishlist(userId);
+            List<ShopProfile> followed = jdbcTemplate.query("""
+                    SELECT s.`id`, s.`shop_name`, COALESCE(s.`logo_url`, '') AS logo_url,
+                           COALESCE(s.`hero_url`, '') AS hero_url, COALESCE(s.`description`, '') AS description,
+                           COALESCE(s.`about`, '') AS about, COALESCE(s.`materials`, '') AS materials,
+                           COALESCE(s.`years_experience`, 1) AS years_experience,
+                           COALESCE(s.`verified_artisan`, false) AS verified_artisan,
+                           COALESCE(s.`rating`, 0) AS rating,
+                           (SELECT COUNT(*) FROM `shop_follows` f2 WHERE f2.`shop_id` = s.`id`) AS follower_count
+                    FROM `shop_follows` f
+                    JOIN `Shops` s ON s.`id` = f.`shop_id`
+                    WHERE f.`user_id` = ?
+                    ORDER BY f.`created_at` DESC
+                    """, this::mapShopProfile, userId);
+            return new UserProfileResponse(profile, addresses, wishlist, followed);
+        } catch (EmptyResultDataAccessException ex) {
+            throw notFound("Khong tim thay profile.");
+        } catch (DataAccessException ex) {
+            throw serviceUnavailable();
+        }
+    }
+
+    public List<ProductCard> getWishlist(Long userIdHeader) {
+        long userId = buyerIdOrDefault(userIdHeader);
+        try {
+            return jdbcTemplate.query(productSelectSql()
+                    + " JOIN `wishlists` w ON w.`product_id` = p.`id` WHERE w.`user_id` = ? ORDER BY w.`created_at` DESC",
+                    this::mapProductCard, userId);
+        } catch (DataAccessException ex) {
+            throw serviceUnavailable();
+        }
+    }
+
+    public WishlistToggleResponse toggleWishlist(Long userIdHeader, Long productId) {
+        long userId = buyerIdOrDefault(userIdHeader);
+        findProduct(productId).orElseThrow(() -> notFound("Khong tim thay san pham."));
+        try {
+            if (exists("SELECT COUNT(*) FROM `wishlists` WHERE `user_id` = ? AND `product_id` = ?", userId, productId)) {
+                jdbcTemplate.update("DELETE FROM `wishlists` WHERE `user_id` = ? AND `product_id` = ?", userId, productId);
+                return new WishlistToggleResponse(productId, false);
+            }
+            jdbcTemplate.update("INSERT INTO `wishlists` (`user_id`, `product_id`) VALUES (?, ?)", userId, productId);
+            notifyUser(userId, "WISHLIST", "Da luu san pham", "San pham da duoc them vao wishlist.", "wishlist-" + productId);
+            return new WishlistToggleResponse(productId, true);
+        } catch (DataAccessException ex) {
+            throw serviceUnavailable();
+        }
+    }
+
+    public FollowToggleResponse toggleFollowShop(Long userIdHeader, Long shopId) {
+        long userId = buyerIdOrDefault(userIdHeader);
+        if (userOwnsShop(userId, shopId)) {
+            throw badRequest("Khong the follow shop cua chinh minh.");
+        }
+        if (!exists("SELECT COUNT(*) FROM `Shops` WHERE `id` = ?", shopId)) {
+            throw notFound("Khong tim thay shop.");
+        }
+        try {
+            if (exists("SELECT COUNT(*) FROM `shop_follows` WHERE `user_id` = ? AND `shop_id` = ?", userId, shopId)) {
+                jdbcTemplate.update("DELETE FROM `shop_follows` WHERE `user_id` = ? AND `shop_id` = ?", userId, shopId);
+                return new FollowToggleResponse(shopId, false, count("SELECT COUNT(*) FROM `shop_follows` WHERE `shop_id` = ?", shopId));
+            }
+            jdbcTemplate.update("INSERT INTO `shop_follows` (`user_id`, `shop_id`) VALUES (?, ?)", userId, shopId);
+            notifyUser(userId, "SHOP_FOLLOWED", "Dang theo doi shop", "Ban se thay cap nhat tu shop nay trong ho so.", "follow-shop-" + shopId);
+            return new FollowToggleResponse(shopId, true, count("SELECT COUNT(*) FROM `shop_follows` WHERE `shop_id` = ?", shopId));
+        } catch (DataAccessException ex) {
+            throw serviceUnavailable();
+        }
+    }
+
+    public QuestionSummary askQuestion(Long userIdHeader, Long productId, QuestionRequest request) {
+        long userId = buyerIdOrDefault(userIdHeader);
+        ProductRow product = findProduct(productId).orElseThrow(() -> notFound("Khong tim thay san pham."));
+        requireText(request.question(), "Vui long nhap cau hoi.");
+        try {
+            long id = nextId("product_questions");
+            jdbcTemplate.update("""
+                    INSERT INTO `product_questions` (`id`, `product_id`, `user_id`, `question`, `status`, `created_at`)
+                    VALUES (?, ?, ?, ?, 'PUBLISHED', CURRENT_TIMESTAMP)
+                    """, id, productId, userId, normalize(request.question()));
+            notifyShopOwner(product.shopId(), "QUESTION_CREATED", "Co cau hoi moi", "Khach hang vua hoi ve san pham " + product.name() + ".", "question-" + id);
+            return getQuestion(id);
+        } catch (DataAccessException ex) {
+            throw serviceUnavailable();
+        }
+    }
+
+    public QuestionSummary answerQuestion(Long shopIdHeader, Long questionId, QuestionAnswerRequest request) {
+        requireText(request.answer(), "Vui long nhap cau tra loi.");
+        try {
+            Long ownerShopId = jdbcTemplate.queryForObject("""
+                    SELECT p.`shop_id`
+                    FROM `product_questions` q
+                    JOIN `Products` p ON p.`id` = q.`product_id`
+                    WHERE q.`id` = ?
+                    """, Long.class, questionId);
+            if (!Objects.equals(ownerShopId, shopIdHeader)) {
+                throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Cau hoi khong thuoc shop nay.");
+            }
+            jdbcTemplate.update("""
+                    UPDATE `product_questions`
+                    SET `answer` = ?, `answered_at` = CURRENT_TIMESTAMP
+                    WHERE `id` = ?
+                    """, normalize(request.answer()), questionId);
+            return getQuestion(questionId);
+        } catch (EmptyResultDataAccessException ex) {
+            throw notFound("Khong tim thay cau hoi.");
+        } catch (DataAccessException ex) {
+            throw serviceUnavailable();
+        }
+    }
+
+    public ReviewSummary addReview(Long userIdHeader, Long productId, ReviewRequest request) {
+        long userId = buyerIdOrDefault(userIdHeader);
+        ProductRow product = findProduct(productId).orElseThrow(() -> notFound("Khong tim thay san pham."));
+        int rating = request.rating() == null ? 5 : request.rating();
+        if (rating < 1 || rating > 5) {
+            throw badRequest("Rating phai tu 1 den 5.");
+        }
+        try {
+            long id = nextId("product_reviews");
+            jdbcTemplate.update("""
+                    INSERT INTO `product_reviews` (`id`, `product_id`, `shop_id`, `user_id`, `rating`, `comment`, `created_at`, `updated_at`)
+                    VALUES (?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+                    """, id, productId, product.shopId(), userId, rating, normalize(request.comment()));
+            jdbcTemplate.update("""
+                    UPDATE `Products`
+                    SET `avg_rating` = (SELECT AVG(`rating`) FROM `product_reviews` WHERE `product_id` = ?)
+                    WHERE `id` = ?
+                    """, productId, productId);
+            notifyShopOwner(product.shopId(), "REVIEW_CREATED", "Co review moi", "San pham " + product.name() + " vua nhan danh gia.", "review-" + id);
+            return getReview(id);
+        } catch (DataAccessException ex) {
+            throw serviceUnavailable();
+        }
+    }
+
+    public List<NotificationSummary> getNotifications(Long userIdHeader) {
+        long userId = buyerIdOrDefault(userIdHeader);
+        try {
+            return jdbcTemplate.query("""
+                    SELECT `id`, `type`, `title`, `message`, `read_at`, `created_at`
+                    FROM `notifications`
+                    WHERE `user_id` = ?
+                    ORDER BY `created_at` DESC
+                    LIMIT 50
+                    """, this::mapNotificationSummary, userId);
+        } catch (DataAccessException ex) {
+            throw serviceUnavailable();
+        }
+    }
+
+    public NotificationCenterResponse getNotificationCenter(Long userIdHeader) {
+        long userId = buyerIdOrDefault(userIdHeader);
+        return new NotificationCenterResponse(getNotifications(userId), count("SELECT COUNT(*) FROM `notifications` WHERE `user_id` = ? AND `read_at` IS NULL", userId));
+    }
+
+    public NotificationCenterResponse markNotificationRead(Long userIdHeader, Long notificationId) {
+        long userId = buyerIdOrDefault(userIdHeader);
+        jdbcTemplate.update("UPDATE `notifications` SET `read_at` = CURRENT_TIMESTAMP WHERE `id` = ? AND `user_id` = ?", notificationId, userId);
+        return getNotificationCenter(userId);
+    }
+
+    public NotificationCenterResponse markAllNotificationsRead(Long userIdHeader) {
+        long userId = buyerIdOrDefault(userIdHeader);
+        jdbcTemplate.update("UPDATE `notifications` SET `read_at` = CURRENT_TIMESTAMP WHERE `user_id` = ? AND `read_at` IS NULL", userId);
+        return getNotificationCenter(userId);
+    }
+
+    public AdminDashboardResponse getAdminDashboard() {
+        return new AdminDashboardResponse(
+                count("SELECT COUNT(*) FROM `Users`"),
+                count("SELECT COUNT(*) FROM `Shops`"),
+                count("SELECT COUNT(*) FROM `Products`"),
+                count("SELECT COUNT(*) FROM `Orders`"),
+                money(sum("SELECT COALESCE(SUM(`total_price`), 0) FROM `Orders`")),
+                count("SELECT COUNT(*) FROM `product_reviews`"),
+                count("SELECT COUNT(*) FROM `product_questions` WHERE `answer` IS NULL")
+        );
+    }
+
+    public SellerDashboardResponse getSellerDashboard(Long shopIdHeader) {
+        long shopId = shopIdOrDefault(shopIdHeader);
+        return new SellerDashboardResponse(
+                shopId,
+                count("SELECT COUNT(*) FROM `Products` WHERE `shop_id` = ?", shopId),
+                count("SELECT COUNT(*) FROM `Products` p JOIN `Storage` st ON st.`product_id` = p.`id` WHERE p.`shop_id` = ? AND COALESCE(st.`quantity`, 0) <= COALESCE(st.`low_stock_alert`, 0)", shopId),
+                count("SELECT COUNT(*) FROM `shop_orders` WHERE `shop_id` = ?", shopId),
+                money(sum("SELECT COALESCE(SUM(`item_subtotal`), 0) FROM `shop_orders` WHERE `shop_id` = ?", shopId)),
+                count("SELECT COUNT(*) FROM `product_reviews` WHERE `shop_id` = ?", shopId),
+                count("SELECT COUNT(*) FROM `product_questions` q JOIN `Products` p ON p.`id` = q.`product_id` WHERE p.`shop_id` = ? AND q.`answer` IS NULL", shopId)
+        );
+    }
+
     public CartResponse getCart(Long buyerIdHeader) {
         long buyerId = buyerIdOrDefault(buyerIdHeader);
         CartState state = loadCartState(buyerId);
@@ -143,10 +445,13 @@ public class MarketplaceService {
             Optional<ProductRow> product = findProduct(item.productId());
             ProductRow row = product.orElseGet(() -> new ProductRow(
                     item.productId(), item.shopId(), "Shop khong xac dinh", "San pham khong con ban",
-                    "Handmade", BigDecimal.ZERO, false, "", "hidden", 0
+                    "Handmade", "INACTIVE", BigDecimal.ZERO, false, "", "hidden", "REJECTED", false, 0
             ));
             boolean lineAvailable = product.isPresent()
                     && "active".equalsIgnoreCase(row.status())
+                    && "APPROVED".equalsIgnoreCase(row.approvalStatus())
+                    && "ACTIVE".equalsIgnoreCase(row.categoryStatus())
+                    && (!row.requiresPersonalization() || StringUtils.hasText(item.note()))
                     && row.stock() >= item.quantity()
                     && item.quantity() > 0;
             if (!lineAvailable) {
@@ -198,6 +503,12 @@ public class MarketplaceService {
                 .orElseThrow(() -> badRequest("San pham khong ton tai."));
         if (!"active".equalsIgnoreCase(product.status())) {
             throw badRequest("San pham dang khong mo ban.");
+        }
+        if (!"APPROVED".equalsIgnoreCase(product.approvalStatus()) || !"ACTIVE".equalsIgnoreCase(product.categoryStatus())) {
+            throw badRequest("San pham hoac danh muc chua duoc phe duyet.");
+        }
+        if (product.requiresPersonalization() && !StringUtils.hasText(request.note())) {
+            throw badRequest("San pham nay bat buoc nhap noi dung ca nhan hoa.");
         }
         CartState state = loadCartState(buyerId);
         List<StoredCartItem> items = new ArrayList<>(state.items());
@@ -313,10 +624,23 @@ public class MarketplaceService {
         requireText(request.address(), "Vui long nhap dia chi.");
 
         CartResponse cart = getCart(buyerId);
+        if (StringUtils.hasText(request.idempotencyKey())) {
+            Optional<CheckoutResponse> existing = findCheckoutByIdempotency(buyerId, request.idempotencyKey());
+            if (existing.isPresent()) {
+                return existing.get();
+            }
+        }
         Integer districtId = parseInteger(request.district());
         CheckoutSummaryResponse summary = getCheckoutSummary(buyerId, districtId, request.ward());
         if (!summary.canCheckout()) {
             throw badRequest("Gio hang chua san sang checkout. Vui long kiem tra ton kho hoac trang thai san pham.");
+        }
+        BigDecimal discountAmount = calculateVoucherDiscount(request.voucherCode(), summary.subtotal());
+        GiftWrapSnapshot giftWrap = findGiftWrap(request.giftWrapTierId());
+        BigDecimal rewardDiscount = money(BigDecimal.valueOf(Math.max(0, request.rewardPointsUsed() == null ? 0 : request.rewardPointsUsed())));
+        BigDecimal adjustedTotal = money(summary.grandTotal().add(giftWrap.price()).subtract(discountAmount).subtract(rewardDiscount));
+        if (adjustedTotal.compareTo(BigDecimal.ZERO) < 0) {
+            adjustedTotal = BigDecimal.ZERO;
         }
 
         long orderId = nextId("Orders");
@@ -326,12 +650,14 @@ public class MarketplaceService {
         jdbcTemplate.update("""
                 INSERT INTO `Orders` (`id`, `buyer_id`, `total_price`, `status`, `created_at`, `shipping_address`,
                   `receiver_name`, `phone_number`, `subtotal_price`, `shipping_fee`, `payment_method`, `payment_status`,
-                  `receiver_phone`, `receiver_province`, `receiver_district`, `receiver_ward`, `receiver_address`, `updated_at`)
-                VALUES (?, ?, ?, ?, CURRENT_TIMESTAMP, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
+                  `receiver_phone`, `receiver_province`, `receiver_district`, `receiver_ward`, `receiver_address`,
+                  `voucher_code`, `discount_amount`, `gift_wrap_tier_id`, `gift_wrap_snapshot`, `gift_message`,
+                  `reward_points_used`, `idempotency_key`, `updated_at`)
+                VALUES (?, ?, ?, ?, CURRENT_TIMESTAMP, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
                 """,
                 orderId,
                 buyerId,
-                summary.grandTotal(),
+                adjustedTotal,
                 orderStatus,
                 shippingAddress,
                 request.receiverName(),
@@ -344,7 +670,14 @@ public class MarketplaceService {
                 displayLocationName(request.provinceName(), request.province()),
                 displayLocationName(request.districtName(), request.district()),
                 displayLocationName(request.wardName(), request.ward()),
-                normalize(request.address()));
+                normalize(request.address()),
+                normalize(request.voucherCode()),
+                discountAmount.add(rewardDiscount),
+                request.giftWrapTierId(),
+                giftWrap.snapshot(),
+                normalize(request.giftMessage()),
+                request.rewardPointsUsed() == null ? 0 : request.rewardPointsUsed(),
+                normalize(request.idempotencyKey()));
 
         Map<Long, ShopCheckoutSummary> feeByShop = new LinkedHashMap<>();
         for (ShopCheckoutSummary shopSummary : summary.shopSummaries()) {
@@ -400,6 +733,10 @@ public class MarketplaceService {
                         WHERE `product_id` = ?
                         LIMIT 1
                         """, line.quantity(), line.productId());
+                jdbcTemplate.update("""
+                        INSERT INTO `inventory_logs` (`id`, `product_id`, `change_qty`, `reason`, `note`)
+                        VALUES (?, ?, ?, 'CHECKOUT_RESERVE', ?)
+                        """, nextId("inventory_logs"), line.productId(), -line.quantity(), "Reserve cho order #" + orderId);
             }
         }
 
@@ -415,7 +752,7 @@ public class MarketplaceService {
                 paymentMethod,
                 paymentMethod,
                 transactionRef,
-                summary.grandTotal(),
+                adjustedTotal,
                 paymentStatus,
                 "{}");
         jdbcTemplate.update("""
@@ -426,12 +763,12 @@ public class MarketplaceService {
                 orderId,
                 paymentMethod,
                 transactionRef,
-                summary.grandTotal());
+                adjustedTotal);
 
         clearCart(buyerId);
         String nextAction = "VNPAY".equals(paymentMethod) ? "PAYMENT_REQUIRED" : "VIEW_ORDER";
         return new CheckoutResponse(orderId, orderStatus, paymentStatus, paymentMethod,
-                summary.grandTotal(), transactionRef, nextAction, "/order-detail.html?id=" + orderId);
+                adjustedTotal, transactionRef, nextAction, "/order-detail.html?id=" + orderId);
     }
 
     public PaymentCreateResponse createVnpayPayment(Long buyerIdHeader, PaymentCreateRequest request) {
@@ -1303,6 +1640,107 @@ public class MarketplaceService {
         );
     }
 
+    private Optional<ProductCard> findProductCard(Long productId) {
+        if (productId == null) {
+            return Optional.empty();
+        }
+        try {
+            return Optional.ofNullable(jdbcTemplate.queryForObject(productSelectSql() + " WHERE p.`id` = ?",
+                    this::mapProductCard, productId));
+        } catch (EmptyResultDataAccessException ex) {
+            return Optional.empty();
+        } catch (DataAccessException ex) {
+            throw serviceUnavailable();
+        }
+    }
+
+    private CategorySummary mapCategorySummary(ResultSet rs, int rowNum) throws SQLException {
+        return new CategorySummary(
+                rs.getLong("id"),
+                rs.getString("name"),
+                rs.getString("slug"),
+                rs.getString("status"),
+                rs.getInt("product_count")
+        );
+    }
+
+    private ReviewSummary mapReviewSummary(ResultSet rs, int rowNum) throws SQLException {
+        return new ReviewSummary(
+                rs.getLong("id"),
+                rs.getInt("rating"),
+                rs.getString("comment"),
+                rs.getString("seller_reply"),
+                rs.getString("full_name"),
+                toLocalDateTime(rs.getTimestamp("created_at"))
+        );
+    }
+
+    private QuestionSummary mapQuestionSummary(ResultSet rs, int rowNum) throws SQLException {
+        return new QuestionSummary(
+                rs.getLong("id"),
+                rs.getString("question"),
+                rs.getString("answer"),
+                rs.getString("asker_name"),
+                rs.getString("status"),
+                toLocalDateTime(rs.getTimestamp("created_at")),
+                toLocalDateTime(rs.getTimestamp("answered_at"))
+        );
+    }
+
+    private ShopProfile mapShopProfile(ResultSet rs, int rowNum) throws SQLException {
+        return new ShopProfile(
+                rs.getLong("id"),
+                rs.getString("shop_name"),
+                rs.getString("logo_url"),
+                rs.getString("hero_url"),
+                rs.getString("description"),
+                rs.getString("about"),
+                rs.getString("materials"),
+                rs.getInt("years_experience"),
+                rs.getBoolean("verified_artisan"),
+                rs.getDouble("rating"),
+                rs.getInt("follower_count")
+        );
+    }
+
+    private UserProfile mapUserProfile(ResultSet rs, int rowNum) throws SQLException {
+        return new UserProfile(
+                rs.getLong("id"),
+                rs.getString("full_name"),
+                rs.getString("email"),
+                rs.getString("phone"),
+                rs.getString("address"),
+                rs.getInt("reward_points"),
+                rs.getString("status"),
+                rs.getString("role")
+        );
+    }
+
+    private AddressSummary mapAddressSummary(ResultSet rs, int rowNum) throws SQLException {
+        return new AddressSummary(
+                rs.getLong("id"),
+                rs.getString("label"),
+                rs.getString("receiver_name"),
+                rs.getString("phone"),
+                rs.getString("province"),
+                rs.getString("district"),
+                rs.getString("ward"),
+                rs.getString("address"),
+                rs.getBoolean("is_default")
+        );
+    }
+
+    private NotificationSummary mapNotificationSummary(ResultSet rs, int rowNum) throws SQLException {
+        return new NotificationSummary(
+                rs.getLong("id"),
+                rs.getString("type"),
+                rs.getString("title"),
+                rs.getString("message"),
+                rs.getTimestamp("read_at") != null,
+                toLocalDateTime(rs.getTimestamp("created_at"))
+        );
+    }
+
     private BuyerOrderSummary mapBuyerOrderSummary(ResultSet rs, int rowNum) throws SQLException {
         return new BuyerOrderSummary(
                 rs.getLong("id"),
@@ -1330,10 +1768,13 @@ public class MarketplaceService {
                             rs.getString("shop_name"),
                             rs.getString("name"),
                             rs.getString("category"),
+                            rs.getString("category_status"),
                             money(rs.getBigDecimal("price")),
                             rs.getBoolean("is_custom"),
                             rs.getString("image"),
                             rs.getString("status"),
+                            rs.getString("approval_status"),
+                            rs.getBoolean("requires_personalization"),
                             rs.getInt("stock")
                     ), productId));
         } catch (EmptyResultDataAccessException ex) {
@@ -1346,9 +1787,14 @@ public class MarketplaceService {
     private String productSelectSql() {
         return """
                 SELECT p.`id`, p.`shop_id`, COALESCE(s.`shop_name`, 'Unknown shop') AS shop_name,
-                       p.`name`, COALESCE(c.`name`, 'Handmade') AS category, COALESCE(p.`price`, 0) AS price,
-                       COALESCE(p.`is_custom`, false) AS is_custom, COALESCE(pi.`url`, '') AS image,
-                       COALESCE(p.`status`, 'hidden') AS status, COALESCE(inv.`stock`, 0) AS stock
+                       p.`name`, COALESCE(c.`name`, 'Handmade') AS category, COALESCE(c.`status`, 'ACTIVE') AS category_status,
+                       COALESCE(p.`price`, 0) AS price,
+                       COALESCE(p.`is_custom`, false) AS is_custom,
+                       COALESCE(NULLIF(p.`main_image_url`, ''), pi.`url`, '') AS image,
+                       COALESCE(p.`status`, 'hidden') AS status,
+                       COALESCE(p.`approval_status`, 'APPROVED') AS approval_status,
+                       COALESCE(p.`requires_personalization`, false) AS requires_personalization,
+                       COALESCE(inv.`stock`, 0) AS stock
                 FROM `Products` p
                 LEFT JOIN `Shops` s ON s.`id` = p.`shop_id`
                 LEFT JOIN `Categories` c ON c.`id` = p.`cat_id`
@@ -1359,6 +1805,144 @@ public class MarketplaceService {
                     GROUP BY `product_id`
                 ) inv ON inv.`product_id` = p.`id`
                 """;
+    }
+
+    private ReviewSummary getReview(Long reviewId) {
+        return jdbcTemplate.queryForObject("""
+                SELECT r.`id`, r.`rating`, r.`comment`, r.`seller_reply`, u.`full_name`, r.`created_at`
+                FROM `product_reviews` r
+                LEFT JOIN `Users` u ON u.`id` = r.`user_id`
+                WHERE r.`id` = ?
+                """, this::mapReviewSummary, reviewId);
+    }
+
+    private Optional<CheckoutResponse> findCheckoutByIdempotency(long buyerId, String idempotencyKey) {
+        try {
+            return Optional.ofNullable(jdbcTemplate.queryForObject("""
+                    SELECT o.`id`, o.`status`, o.`payment_status`, o.`payment_method`, o.`total_price`,
+                           COALESCE(pt.`transaction_ref`, '') AS transaction_ref
+                    FROM `Orders` o
+                    LEFT JOIN `payment_transactions` pt ON pt.`order_id` = o.`id`
+                    WHERE o.`buyer_id` = ? AND o.`idempotency_key` = ?
+                    ORDER BY o.`id` DESC
+                    LIMIT 1
+                    """, (rs, rowNum) -> new CheckoutResponse(
+                    rs.getLong("id"),
+                    rs.getString("status"),
+                    rs.getString("payment_status"),
+                    rs.getString("payment_method"),
+                    money(rs.getBigDecimal("total_price")),
+                    rs.getString("transaction_ref"),
+                    "VNPAY".equalsIgnoreCase(rs.getString("payment_method")) ? "PAYMENT_REQUIRED" : "VIEW_ORDER",
+                    "/order-detail.html?id=" + rs.getLong("id")
+            ), buyerId, idempotencyKey));
+        } catch (EmptyResultDataAccessException ex) {
+            return Optional.empty();
+        }
+    }
+
+    private BigDecimal calculateVoucherDiscount(String voucherCode, BigDecimal subtotal) {
+        if (!StringUtils.hasText(voucherCode)) {
+            return BigDecimal.ZERO;
+        }
+        try {
+            Map<String, Object> voucher = jdbcTemplate.queryForMap("""
+                    SELECT `discount_percent`, `max_discount_amount`, `min_order_amount`, `usage_limit`, `used_count`
+                    FROM `vouchers`
+                    WHERE `code` = ? AND `active` = true AND (`end_at` IS NULL OR `end_at` > CURRENT_TIMESTAMP)
+                    """, voucherCode.trim().toUpperCase(Locale.ROOT));
+            BigDecimal minOrder = money((BigDecimal) voucher.get("min_order_amount"));
+            if (subtotal.compareTo(minOrder) < 0) {
+                throw badRequest("Voucher chua dat gia tri don toi thieu.");
+            }
+            int usageLimit = ((Number) voucher.get("usage_limit")).intValue();
+            int usedCount = ((Number) voucher.get("used_count")).intValue();
+            if (usageLimit > 0 && usedCount >= usageLimit) {
+                throw badRequest("Voucher da het luot su dung.");
+            }
+            BigDecimal discount = subtotal.multiply((BigDecimal) voucher.get("discount_percent")).divide(BigDecimal.valueOf(100));
+            BigDecimal maxDiscount = money((BigDecimal) voucher.get("max_discount_amount"));
+            if (maxDiscount.compareTo(BigDecimal.ZERO) > 0) {
+                discount = discount.min(maxDiscount);
+            }
+            jdbcTemplate.update("UPDATE `vouchers` SET `used_count` = COALESCE(`used_count`, 0) + 1 WHERE `code` = ?",
+                    voucherCode.trim().toUpperCase(Locale.ROOT));
+            return money(discount);
+        } catch (EmptyResultDataAccessException ex) {
+            throw badRequest("Voucher khong hop le.");
+        }
+    }
+
+    private GiftWrapSnapshot findGiftWrap(Long tierId) {
+        if (tierId == null) {
+            return new GiftWrapSnapshot(BigDecimal.ZERO, "");
+        }
+        try {
+            return jdbcTemplate.queryForObject("""
+                    SELECT `name`, `description`, `price`, `has_card`
+                    FROM `gift_wrap_tiers`
+                    WHERE `id` = ? AND `active` = true
+                    """, (rs, rowNum) -> new GiftWrapSnapshot(
+                    money(rs.getBigDecimal("price")),
+                    rs.getString("name") + " - " + rs.getString("description") + " - card:" + rs.getBoolean("has_card")
+            ), tierId);
+        } catch (EmptyResultDataAccessException ex) {
+            throw badRequest("Goi qua khong hop le.");
+        }
+    }
+
+    private QuestionSummary getQuestion(Long questionId) {
+        return jdbcTemplate.queryForObject("""
+                SELECT q.`id`, q.`question`, q.`answer`, COALESCE(u.`full_name`, 'Khach hang') AS asker_name,
+                       q.`status`, q.`created_at`, q.`answered_at`
+                FROM `product_questions` q
+                LEFT JOIN `Users` u ON u.`id` = q.`user_id`
+                WHERE q.`id` = ?
+                """, this::mapQuestionSummary, questionId);
+    }
+
+    private boolean exists(String sql, Object... args) {
+        return count(sql, args) > 0;
+    }
+
+    private int count(String sql, Object... args) {
+        try {
+            Integer value = jdbcTemplate.queryForObject(sql, Integer.class, args);
+            return value == null ? 0 : value;
+        } catch (DataAccessException ex) {
+            return 0;
+        }
+    }
+
+    private BigDecimal sum(String sql, Object... args) {
+        try {
+            BigDecimal value = jdbcTemplate.queryForObject(sql, BigDecimal.class, args);
+            return value == null ? BigDecimal.ZERO : value;
+        } catch (DataAccessException ex) {
+            return BigDecimal.ZERO;
+        }
+    }
+
+    private void notifyShopOwner(Long shopId, String type, String title, String message, String dedupeKey) {
+        try {
+            Long ownerId = jdbcTemplate.queryForObject("SELECT `owner_id` FROM `Shops` WHERE `id` = ?", Long.class, shopId);
+            notifyUser(ownerId, type, title, message, dedupeKey);
+        } catch (DataAccessException ignored) {
+        }
+    }
+
+    private void notifyUser(Long userId, String type, String title, String message, String dedupeKey) {
+        if (userId == null) {
+            return;
+        }
+        try {
+            jdbcTemplate.update("""
+                    INSERT INTO `notifications` (`id`, `user_id`, `type`, `title`, `message`, `dedupe_key`, `created_at`)
+                    VALUES (?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
+                    ON DUPLICATE KEY UPDATE `message` = VALUES(`message`)
+                    """, nextId("notifications"), userId, type, title, message, dedupeKey);
+        } catch (DataAccessException ignored) {
+        }
     }
 
     private CartState loadCartState(long buyerId) {
@@ -1618,12 +2202,18 @@ public class MarketplaceService {
             String shopName,
             String name,
             String category,
+            String categoryStatus,
             BigDecimal price,
             boolean customizable,
             String image,
             String status,
+            String approvalStatus,
+            boolean requiresPersonalization,
             int stock
     ) {
+    }
+
+    private record GiftWrapSnapshot(BigDecimal price, String snapshot) {
     }
 
     private record CartState(List<StoredCartItem> items) {
@@ -1691,6 +2281,156 @@ public class MarketplaceService {
     ) {
     }
 
+    public record HomepageResponse(
+            List<HomepageBanner> banners,
+            List<CategorySummary> categories,
+            List<ProductCard> featuredProducts,
+            List<ProductCard> bestSellers,
+            List<PromotionCard> promotions
+    ) {
+    }
+
+    public record HomepageBanner(Long id, String title, String subtitle, String imageUrl, String linkUrl) {
+    }
+
+    public record CategorySummary(Long id, String name, String slug, String status, int productCount) {
+    }
+
+    public record PromotionCard(String code, String title, String description, String status) {
+    }
+
+    public record ProductDetailResponse(
+            ProductCard product,
+            List<ReviewSummary> reviews,
+            List<QuestionSummary> questions,
+            boolean wished,
+            boolean followedShop,
+            List<ProductCard> relatedProducts
+    ) {
+    }
+
+    public record ReviewSummary(
+            Long id,
+            int rating,
+            String comment,
+            String sellerReply,
+            String customerName,
+            LocalDateTime createdAt
+    ) {
+    }
+
+    public record QuestionSummary(
+            Long id,
+            String question,
+            String answer,
+            String askerName,
+            String status,
+            LocalDateTime createdAt,
+            LocalDateTime answeredAt
+    ) {
+    }
+
+    public record QuestionRequest(String question) {
+    }
+
+    public record QuestionAnswerRequest(String answer) {
+    }
+
+    public record ReviewRequest(Integer rating, String comment) {
+    }
+
+    public record ShopProfile(
+            Long id,
+            String shopName,
+            String logoUrl,
+            String heroUrl,
+            String description,
+            String about,
+            String materials,
+            int yearsExperience,
+            boolean verifiedArtisan,
+            double rating,
+            int followerCount
+    ) {
+    }
+
+    public record PublicShopResponse(ShopProfile shop, List<ProductCard> products, boolean followed) {
+    }
+
+    public record UserProfile(
+            Long id,
+            String fullName,
+            String email,
+            String phone,
+            String address,
+            int rewardPoints,
+            String status,
+            String role
+    ) {
+    }
+
+    public record AddressSummary(
+            Long id,
+            String label,
+            String receiverName,
+            String phone,
+            String province,
+            String district,
+            String ward,
+            String address,
+            boolean defaultAddress
+    ) {
+    }
+
+    public record UserProfileResponse(
+            UserProfile profile,
+            List<AddressSummary> addresses,
+            List<ProductCard> wishlist,
+            List<ShopProfile> followedShops
+    ) {
+    }
+
+    public record WishlistToggleResponse(Long productId, boolean wished) {
+    }
+
+    public record FollowToggleResponse(Long shopId, boolean followed, int followerCount) {
+    }
+
+    public record NotificationSummary(
+            Long id,
+            String type,
+            String title,
+            String message,
+            boolean read,
+            LocalDateTime createdAt
+    ) {
+    }
+
+    public record NotificationCenterResponse(List<NotificationSummary> notifications, int unreadCount) {
+    }
+
+    public record AdminDashboardResponse(
+            int users,
+            int shops,
+            int products,
+            int orders,
+            BigDecimal revenue,
+            int reviews,
+            int pendingQuestions
+    ) {
+    }
+
+    public record SellerDashboardResponse(
+            Long shopId,
+            int products,
+            int lowStockProducts,
+            int orders,
+            BigDecimal revenue,
+            int reviews,
+            int pendingQuestions
+    ) {
+    }
+
     public record CartItemRequest(Long productId, Long shopId, Integer quantity, String customOptionsJson, String note) {
     }
 
@@ -1753,7 +2493,12 @@ public class MarketplaceService {
             String districtName,
             String wardName,
             String address,
-            String paymentMethod
+            String paymentMethod,
+            String voucherCode,
+            Long giftWrapTierId,
+            String giftMessage,
+            Integer rewardPointsUsed,
+            String idempotencyKey
     ) {
     }
 

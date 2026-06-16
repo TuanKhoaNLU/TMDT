@@ -3,6 +3,7 @@ import { NavLink, Outlet, useNavigate } from "react-router-dom";
 import {
   Bell,
   Home,
+  Heart,
   LogIn,
   LogOut,
   Menu,
@@ -11,6 +12,7 @@ import {
   Search,
   ShieldCheck,
   ShoppingCart,
+  MessageSquare,
   Store,
   UserRound
 } from "lucide-react";
@@ -70,27 +72,33 @@ export function Layout() {
             </NavLink>
             {user ? (
               <>
+                <NavLink to="/wishlist">
+                  <Heart size={17} /> Wishlist
+                </NavLink>
+                <NavLink to="/chat">
+                  <MessageSquare size={17} /> Chat
+                </NavLink>
                 <NavLink to="/orders">
                   <ReceiptText size={17} /> Don mua
                 </NavLink>
                 {user.shopId && (
-                  <NavLink to="/seller/orders">
+                  <NavLink to="/seller">
                     <Store size={17} /> Kenh ban
                   </NavLink>
                 )}
                 {user.role === 'ADMIN' && (
-                  <NavLink to="/admin/orders">
+                  <NavLink to="/admin">
                     <ShieldCheck size={17} /> Admin
                   </NavLink>
                 )}
                 <div className="auth-menu">
-                  <button className="icon-btn header-icon" title="Thong bao" type="button">
+                  <button className="icon-btn header-icon" title="Thong bao" type="button" onClick={() => navigate("/notifications")}>
                     <Bell size={17} />
                   </button>
-                  <span className="user-greeting">
+                  <button className="user-greeting plain-user" type="button" onClick={() => navigate("/profile")}>
                     <UserRound size={15} />
                     {user.fullName || 'User'}
-                  </span>
+                  </button>
                   <button onClick={handleLogout} className="btn-logout" title="Log Out">
                     <LogOut size={17} />
                   </button>
@@ -111,6 +119,9 @@ export function Layout() {
             <a href="/?category=Decor%20thu%20cong">Decor thu cong</a>
             <a href="/cart">Gio hang da shop</a>
             <a href="/orders">Theo doi don</a>
+            <a href="/chat">Chat/quote</a>
+            <a href="/admin/manage">Admin manage</a>
+            <a href="/modules">Full plan modules</a>
           </div>
         </div>
       </header>
