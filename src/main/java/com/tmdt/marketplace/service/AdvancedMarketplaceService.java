@@ -31,9 +31,9 @@ public class AdvancedMarketplaceService {
                 listGiftWrapTiers(),
                 listCommissionPosts(),
                 listCustomOrders(null, null),
-                listReports(),
-                platformSettings(),
-                paymentReliability()
+                List.of(),
+                Map.of(),
+                new PaymentReliabilityResponse(0, 0, 0, 0)
         );
     }
 
@@ -377,7 +377,8 @@ public class AdvancedMarketplaceService {
         return findConversation(existing);
     }
 
-    public List<MessageSummary> listMessages(Long conversationId) {
+    public List<MessageSummary> listMessages(Long conversationId, Long userId, String role, Long shopId) {
+        ensureConversationAccess(conversationId, userId, role, shopId);
         return jdbcTemplate.query("""
                 SELECT `id`, `conversation_id`, `sender_id`, `sender_role`, `message_type`, `body`, `image_url`,
                        `custom_order_id`, `created_at`
@@ -387,7 +388,8 @@ public class AdvancedMarketplaceService {
                 """, this::mapMessage, conversationId);
     }
 
-    public MessageSummary sendMessage(Long userId, String role, Long conversationId, MessageRequest request) {
+    public MessageSummary sendMessage(Long userId, String role, Long conversationId, Long shopId, MessageRequest request) {
+        ensureConversationAccess(conversationId, userId, role, shopId);
         requireText(request.body(), "Tin nhan khong duoc rong.");
         long id = nextId("chat_messages");
         String senderRole = role == null ? "CUSTOMER" : role;
@@ -398,11 +400,12 @@ public class AdvancedMarketplaceService {
                 request.body(), request.imageUrl(), request.customOrderId());
         jdbcTemplate.update("UPDATE `chat_conversations` SET `last_message` = ?, `updated_at` = CURRENT_TIMESTAMP WHERE `id` = ?",
                 request.body(), conversationId);
-        return listMessages(conversationId).stream().filter(message -> message.id().equals(id)).findFirst().orElseThrow();
+        return listMessages(conversationId, userId, role, shopId).stream().filter(message -> message.id().equals(id)).findFirst().orElseThrow();
     }
 
     @Transactional
     public MessageSummary sendCustomQuote(Long sellerId, Long shopId, Long conversationId, CustomQuoteRequest request) {
+        ensureConversationAccess(conversationId, sellerId, "SELLER", shopId);
         requireText(request.title(), "Thieu tieu de bao gia.");
         Long customerId = jdbcTemplate.queryForObject("SELECT `customer_id` FROM `chat_conversations` WHERE `id` = ? AND `shop_id` = ?",
                 Long.class, conversationId, shopId);
@@ -419,7 +422,7 @@ public class AdvancedMarketplaceService {
                 """, messageId, conversationId, sellerId, body, customOrderId);
         jdbcTemplate.update("UPDATE `chat_conversations` SET `last_message` = ?, `customer_unread` = COALESCE(`customer_unread`, 0) + 1, `updated_at` = CURRENT_TIMESTAMP WHERE `id` = ?",
                 body, conversationId);
-        return listMessages(conversationId).stream().filter(message -> message.id().equals(messageId)).findFirst().orElseThrow();
+        return listMessages(conversationId, sellerId, "SELLER", shopId).stream().filter(message -> message.id().equals(messageId)).findFirst().orElseThrow();
     }
 
     public List<CustomOrderSummary> listCustomOrders(Long userId, Long shopId) {
@@ -450,6 +453,18 @@ public class AdvancedMarketplaceService {
     }
 
     public CustomOrderSummary createCustomOrder(Long sellerId, Long shopId, CustomOrderRequest request) {
+        if (!shopOwnedByUser(sellerId, shopId)) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Tai khoan khong quan ly shop nay");
+        }
+        Map<String, Object> conversation = jdbcTemplate.queryForMap("""
+                SELECT `customer_id`, `shop_id`
+                FROM `chat_conversations`
+                WHERE `id` = ? AND `shop_id` = ?
+                """, request.conversationId(), shopId);
+        Long conversationCustomerId = ((Number) conversation.get("customer_id")).longValue();
+        if (request.customerId() == null || !request.customerId().equals(conversationCustomerId)) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Tai khoan khong quan ly cuoc hoi thoai nay");
+        }
         long id = nextId("custom_orders");
         jdbcTemplate.update("""
                 INSERT INTO `custom_orders` (`id`, `customer_id`, `shop_id`, `conversation_id`, `title`, `description`, `price`, `status`, `payment_status`)
@@ -458,8 +473,24 @@ public class AdvancedMarketplaceService {
         return listCustomOrders(null, shopId).stream().filter(order -> order.id().equals(id)).findFirst().orElseThrow();
     }
 
-    public CustomOrderSummary updateCustomOrderStatus(Long customOrderId, StatusRequest request) {
+    public CustomOrderSummary updateCustomOrderStatus(Long customOrderId, StatusRequest request, Long userId, String role, Long shopId) {
         requireText(request.status(), "Thieu status.");
+        Map<String, Object> order = jdbcTemplate.queryForMap("""
+                SELECT `customer_id`, `shop_id`
+                FROM `custom_orders`
+                WHERE `id` = ?
+                """, customOrderId);
+        Long customerId = ((Number) order.get("customer_id")).longValue();
+        Long orderShopId = ((Number) order.get("shop_id")).longValue();
+        if ("ADMIN".equalsIgnoreCase(role)) {
+            // admin is allowed
+        } else if ("SELLER".equalsIgnoreCase(role)) {
+            if (shopId == null || !shopId.equals(orderShopId) || !shopOwnedByUser(userId, shopId)) {
+                throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Tai khoan khong quan ly don nay");
+            }
+        } else if (!customerId.equals(userId)) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Tai khoan khong quan ly don nay");
+        }
         jdbcTemplate.update("UPDATE `custom_orders` SET `status` = ?, `updated_at` = CURRENT_TIMESTAMP WHERE `id` = ?",
                 request.status(), customOrderId);
         return jdbcTemplate.queryForObject("""
@@ -652,6 +683,38 @@ public class AdvancedMarketplaceService {
                 JOIN `Shops` s ON s.`id` = c.`shop_id`
                 WHERE c.`id` = ?
                 """, this::mapConversation, id);
+    }
+
+    private void ensureConversationAccess(Long conversationId, Long userId, String role, Long shopId) {
+        Map<String, Object> row = jdbcTemplate.queryForMap("""
+                SELECT `customer_id`, `shop_id`
+                FROM `chat_conversations`
+                WHERE `id` = ?
+                """, conversationId);
+        Long customerId = ((Number) row.get("customer_id")).longValue();
+        Long conversationShopId = ((Number) row.get("shop_id")).longValue();
+
+        if ("ADMIN".equalsIgnoreCase(role)) {
+            return;
+        }
+        if ("SELLER".equalsIgnoreCase(role)) {
+            if (shopId == null || !shopId.equals(conversationShopId) || !shopOwnedByUser(userId, shopId)) {
+                throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Tai khoan khong quan ly cuoc hoi thoai nay");
+            }
+            return;
+        }
+        if (!customerId.equals(userId)) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Tai khoan khong quan ly cuoc hoi thoai nay");
+        }
+    }
+
+    private boolean shopOwnedByUser(Long userId, Long shopId) {
+        Integer count = jdbcTemplate.queryForObject("""
+                SELECT COUNT(*)
+                FROM `Shops`
+                WHERE `id` = ? AND `owner_id` = ?
+                """, Integer.class, shopId, userId);
+        return count != null && count > 0;
     }
 
     private long nextId(String tableName) {

@@ -15,8 +15,6 @@ export default function RegisterPage() {
     e.preventDefault();
     try {
       const response = await axiosInstance.post('/auth/register', { username, password, email, fullName });
-      localStorage.setItem('auth_token', response.data.token);
-      localStorage.setItem('auth_user', JSON.stringify(response.data));
       navigate(`/verify-otp?email=${encodeURIComponent(email)}`);
     } catch (err) {
       setError(err.message || 'Registration failed.');

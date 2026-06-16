@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { ShieldCheck, ShoppingBag, Store } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
+import { useCart } from '../state/CartContext';
 import axiosInstance from '../api/axiosInstance';
 
 export default function LoginPage() {
@@ -9,6 +10,7 @@ export default function LoginPage() {
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const { login } = useAuth();
+  const { refreshCart } = useCart();
   const navigate = useNavigate();
 
   const handleLogin = async (e) => {
@@ -17,6 +19,7 @@ export default function LoginPage() {
       const response = await axiosInstance.post('/auth/login', { username, password });
       const { token, ...userData } = response.data;
       login(userData, token);
+      await refreshCart();
       navigate('/');
     } catch (err) {
       setError(err.message || 'Login failed. Please check your credentials.');

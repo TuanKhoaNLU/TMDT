@@ -421,19 +421,27 @@ public class ApiController {
 
     @GetMapping("/v1/chat/conversations/{conversationId}/messages")
     public List<MessageSummary> messages(
+            @RequestHeader(value = "X-Shop-Id", required = false) Long shopId,
+            @RequestAttribute(value = "shopId", required = false) Long tokenShopId,
             @RequestAttribute(value = "userId", required = false) Long tokenUserId,
+            @RequestAttribute(value = "role", required = false) String role,
             @PathVariable Long conversationId) {
-        requireUserId(tokenUserId);
-        return advancedMarketplaceService.listMessages(conversationId);
+        Long userId = requireUserId(tokenUserId);
+        Long effectiveShopId = "SELLER".equalsIgnoreCase(role) ? requireSellerShopId(shopId, tokenShopId, tokenUserId, role) : null;
+        return advancedMarketplaceService.listMessages(conversationId, userId, role, effectiveShopId);
     }
 
     @PostMapping("/v1/chat/conversations/{conversationId}/messages")
     public MessageSummary sendMessage(
+            @RequestHeader(value = "X-Shop-Id", required = false) Long shopId,
+            @RequestAttribute(value = "shopId", required = false) Long tokenShopId,
             @RequestAttribute(value = "userId", required = false) Long tokenUserId,
             @RequestAttribute(value = "role", required = false) String role,
             @PathVariable Long conversationId,
             @RequestBody MessageRequest request) {
-        return advancedMarketplaceService.sendMessage(requireUserId(tokenUserId), role, conversationId, request);
+        Long userId = requireUserId(tokenUserId);
+        Long effectiveShopId = "SELLER".equalsIgnoreCase(role) ? requireSellerShopId(shopId, tokenShopId, tokenUserId, role) : null;
+        return advancedMarketplaceService.sendMessage(userId, role, conversationId, effectiveShopId, request);
     }
 
     @PostMapping("/v1/chat/conversations/{conversationId}/custom-quotes")
@@ -495,11 +503,15 @@ public class ApiController {
 
     @PutMapping("/v1/custom-orders/{customOrderId}/status")
     public CustomOrderSummary updateCustomOrderStatus(
+            @RequestHeader(value = "X-Shop-Id", required = false) Long shopId,
+            @RequestAttribute(value = "shopId", required = false) Long tokenShopId,
             @RequestAttribute(value = "userId", required = false) Long tokenUserId,
+            @RequestAttribute(value = "role", required = false) String role,
             @PathVariable Long customOrderId,
             @RequestBody StatusRequest request) {
-        requireUserId(tokenUserId);
-        return advancedMarketplaceService.updateCustomOrderStatus(customOrderId, request);
+        Long userId = requireUserId(tokenUserId);
+        Long effectiveShopId = "SELLER".equalsIgnoreCase(role) ? requireSellerShopId(shopId, tokenShopId, tokenUserId, role) : null;
+        return advancedMarketplaceService.updateCustomOrderStatus(customOrderId, request, userId, role, effectiveShopId);
     }
 
     @GetMapping("/v1/commissions")

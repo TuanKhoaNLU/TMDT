@@ -107,9 +107,7 @@ public class AuthController {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Username hoac Email da ton tai");
         }
 
-        String token = jwtUtil.generateToken(nextUserId, "BUYER", null);
-        String refreshToken = issueRefreshToken(nextAccountId);
-        return new LoginResponse(token, refreshToken, nextUserId, "BUYER", null, request.fullName(), "PENDING");
+        return new LoginResponse(null, null, nextUserId, "BUYER", null, request.fullName(), "PENDING");
     }
 
     @PostMapping("/verify-otp")
@@ -146,13 +144,17 @@ public class AuthController {
                 JOIN Users u ON u.id = a.user_id
                 WHERE rt.token = ? AND rt.revoked = false AND (rt.expires_at IS NULL OR rt.expires_at > CURRENT_TIMESTAMP)
                 """, request.refreshToken());
+        String userStatus = (String) row.get("user_status");
+        if (!"ACTIVE".equalsIgnoreCase(userStatus)) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Tai khoan chua active hoac dang bi khoa");
+        }
         jdbcTemplate.update("UPDATE refresh_tokens SET revoked = true WHERE id = ?", row.get("refresh_id"));
         long userId = ((Number) row.get("user_id")).longValue();
         String role = (String) row.get("role");
         Long shopId = firstShopId(userId);
         String token = jwtUtil.generateToken(userId, role, shopId);
         String refreshToken = issueRefreshToken(((Number) row.get("id")).longValue());
-        return new LoginResponse(token, refreshToken, userId, role, shopId, (String) row.get("full_name"), (String) row.get("user_status"));
+        return new LoginResponse(token, refreshToken, userId, role, shopId, (String) row.get("full_name"), userStatus);
     }
 
     @PostMapping("/logout")
