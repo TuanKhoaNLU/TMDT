@@ -15,10 +15,12 @@ import java.util.Map;
 public class OrderController {
 
     private final MarketplaceService marketplaceService;
+    private final MarketplaceModuleService marketplaceModuleService;
     private final RequestGuard requestGuard;
 
-    public OrderController(MarketplaceService marketplaceService, RequestGuard requestGuard) {
+    public OrderController(MarketplaceService marketplaceService, MarketplaceModuleService marketplaceModuleService, RequestGuard requestGuard) {
         this.marketplaceService = marketplaceService;
+        this.marketplaceModuleService = marketplaceModuleService;
         this.requestGuard = requestGuard;
     }
 
@@ -69,5 +71,20 @@ public class OrderController {
             @PathVariable Long orderId,
             @PathVariable Long shopOrderId) {
         return marketplaceService.cancelBuyerShopOrder(requestGuard.requireUserId(tokenUserId), orderId, shopOrderId);
+    }
+
+    @PostMapping("/v1/orders/{orderId}/shop-orders/{shopOrderId}/returns")
+    public ReturnRequestSummary requestReturn(
+            @RequestAttribute(value = "userId", required = false) Long tokenUserId,
+            @PathVariable Long orderId,
+            @PathVariable Long shopOrderId,
+            @RequestBody ReturnRequest request) {
+        return marketplaceModuleService.createReturnRequest(requestGuard.requireUserId(tokenUserId), orderId, shopOrderId, request);
+    }
+
+    @GetMapping("/v1/orders/returns")
+    public List<ReturnRequestSummary> buyerReturns(
+            @RequestAttribute(value = "userId", required = false) Long tokenUserId) {
+        return marketplaceModuleService.listReturnRequests(requestGuard.requireUserId(tokenUserId), null);
     }
 }

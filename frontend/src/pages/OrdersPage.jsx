@@ -20,12 +20,12 @@ import { StatusBadge } from "../components/StatusBadge";
 import { formatDate, formatMoney } from "../utils/format";
 
 const filters = [
-  { value: "ALL", label: "Tat ca" },
+  { value: "ALL", label: "Tất cả" },
   { value: "PENDING_PAYMENT", label: "Cho thanh toan" },
-  { value: "PROCESSING", label: "Dang xu ly" },
-  { value: "SHIPPING", label: "Dang giao" },
+  { value: "PROCESSING", label: "Đang xử lý" },
+  { value: "SHIPPING", label: "Đang giao" },
   { value: "COMPLETED", label: "Hoan tat" },
-  { value: "CANCELLED", label: "Da huy" }
+  { value: "CANCELLED", label: "Đã hủy" }
 ];
 
 export default function OrdersPage() {
@@ -62,13 +62,13 @@ export default function OrdersPage() {
 
   const stats = useMemo(
     () => [
-      { label: "Tong don", value: orders.length, icon: ReceiptText },
+      { label: "Tổng đơn", value: orders.length, icon: ReceiptText },
       {
         label: "Cho thanh toan",
         value: orders.filter((order) => order.status === "PENDING_PAYMENT" || order.paymentStatus === "PENDING").length,
         icon: CreditCard
       },
-      { label: "Dang giao", value: orders.filter((order) => order.status === "SHIPPING").length, icon: Truck },
+      { label: "Đang giao", value: orders.filter((order) => order.status === "SHIPPING").length, icon: Truck },
       { label: "Hoan tat", value: orders.filter((order) => order.status === "COMPLETED").length, icon: PackageCheck }
     ],
     [orders]
@@ -83,7 +83,7 @@ export default function OrdersPage() {
   if (isLoading) {
     return (
       <section className="loading-panel">
-        <Loader2 className="spin" size={22} /> Dang tai don hang...
+        <Loader2 className="spin" size={22} /> Đang tải đơn hàng...
       </section>
     );
   }
@@ -97,8 +97,8 @@ export default function OrdersPage() {
       <section className="order-dashboard">
         <div className="order-dashboard-copy">
           <span className="section-kicker">Buyer center</span>
-          <h1>Don mua</h1>
-          <p className="muted">Theo doi thanh toan, goi hang theo shop va trang thai giao hang trong mot man hinh.</p>
+          <h1>Đơn mua</h1>
+          <p className="muted">Theo dõi thanh toán, gói hàng theo shop và trạng thái giao hàng trong một màn hình.</p>
         </div>
         <div className="order-stat-grid">
           {stats.map((stat) => {
@@ -131,7 +131,7 @@ export default function OrdersPage() {
       {actionError && <section className="alert error">{actionError}</section>}
 
       {!visibleOrders.length ? (
-        <EmptyState title="Chua co don phu hop" />
+        <EmptyState title="Chưa có đơn phù hợp" />
       ) : (
         visibleOrders.map((order) => {
           const canPayAgain =
@@ -169,7 +169,7 @@ export default function OrdersPage() {
                     <Store size={16} /> {order.shopCount} shop
                   </span>
                   <span>
-                    <PackageCheck size={16} /> {order.itemCount} san pham
+                    <PackageCheck size={16} /> {order.itemCount} sản phẩm
                   </span>
                   <span>
                     <CreditCard size={16} /> {order.paymentMethod}
@@ -177,14 +177,14 @@ export default function OrdersPage() {
                 </div>
               </div>
               <div className="order-totals total-box">
-                <span>Tong thanh toan</span>
+                <span>Tổng thanh toán</span>
                 <strong>{formatMoney(order.total)}</strong>
-                <small>{order.paymentMethod === "COD" ? "Thu ho khi giao" : "Cong thanh toan VNPay"}</small>
+                <small>{order.paymentMethod === "COD" ? "Thu ho khi giao" : "Cổng thanh toán VNPay"}</small>
               </div>
               <div className="card-actions order-actions">
                 {canPayAgain && (
                   <button className="btn primary" onClick={() => payAgain(order.id)}>
-                    <CreditCard size={17} /> Thanh toan lai
+                    <CreditCard size={17} /> Thanh toán lại
                   </button>
                 )}
                 {canCancel && (
@@ -193,12 +193,12 @@ export default function OrdersPage() {
                     disabled={cancelOrder.isPending}
                     onClick={() => cancelOrder.mutate(order.id)}
                   >
-                    <XCircle size={17} /> Huy don
+                    <XCircle size={17} /> Hủy đơn
                   </button>
                 )}
                 {canManagePackageCancel && (
                   <Link className="btn secondary" to={`/orders/${order.id}`}>
-                    <XCircle size={17} /> Huy theo shop
+                    <XCircle size={17} /> Hủy theo shop
                   </Link>
                 )}
                 <Link className="btn secondary" to={`/orders/${order.id}`}>

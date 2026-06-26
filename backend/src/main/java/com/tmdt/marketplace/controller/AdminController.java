@@ -183,4 +183,20 @@ public class AdminController {
         requestGuard.requireRole(role, "ADMIN");
         return marketplaceService.cancelAdminShopOrder(orderId, shopOrderId);
     }
+
+    @GetMapping("/v1/admin/returns")
+    public List<ReturnRequestSummary> adminReturns(
+            @RequestAttribute(value = "role", required = false) String role) {
+        requestGuard.requireRole(role, "ADMIN");
+        return marketplaceModuleService.listReturnRequests(null, null);
+    }
+
+    @PutMapping("/v1/admin/returns/{returnId}")
+    public ReturnRequestSummary updateAdminReturn(
+            @RequestAttribute(value = "role", required = false) String role,
+            @PathVariable Long returnId,
+            @RequestBody ReturnUpdateRequest request) {
+        requestGuard.requireRole(role, "ADMIN");
+        return marketplaceModuleService.updateReturnRequest(returnId, request, null);
+    }
 }

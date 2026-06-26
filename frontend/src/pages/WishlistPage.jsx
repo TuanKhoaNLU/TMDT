@@ -15,7 +15,7 @@ export default function WishlistPage() {
   });
 
   if (isLoading) {
-    return <section className="loading-panel"><Loader2 className="spin" size={22} /> Dang tai wishlist...</section>;
+    return <section className="loading-panel"><Loader2 className="spin" size={22} /> Đang tải wishlist...</section>;
   }
 
   return (
@@ -23,8 +23,8 @@ export default function WishlistPage() {
       <section className="page-head">
         <div>
           <span className="section-kicker"><Heart size={16} /> Wishlist</span>
-          <h1>San pham yeu thich</h1>
-          <p className="muted">Luu san pham handmade de mua sau hoac chat voi shop.</p>
+          <h1>Sản phẩm yêu thích</h1>
+          <p className="muted">Lưu sản phẩm handmade để mua sau hoặc chat với shop.</p>
         </div>
       </section>
 
@@ -33,7 +33,7 @@ export default function WishlistPage() {
           <article className="product-card" key={product.id}>
             <div className="img-wrapper">
               <Link to={`/products/${product.id}`}><img src={product.image} alt={product.name} /></Link>
-              <span className="mall-tag">{product.customizable ? "Dat rieng" : "Co san"}</span>
+              <span className="mall-tag">{product.customizable ? "Đặt riêng" : "Có sẵn"}</span>
             </div>
             <div className="product-body">
               <div className="product-info">
@@ -46,7 +46,7 @@ export default function WishlistPage() {
               </div>
               <div className="product-actions">
                 <button className="btn primary" onClick={() => addItem(product.id, 1)} type="button">
-                  <ShoppingCart size={17} /> Them gio
+                  <ShoppingCart size={17} /> Thêm giỏ
                 </button>
                 <button className="btn secondary danger-btn" onClick={() => toggle.mutate(product.id)} type="button">
                   <Trash2 size={17} /> Bo luu
@@ -55,7 +55,7 @@ export default function WishlistPage() {
             </div>
           </article>
         ))}
-        {!data.length && <section className="empty-state compact-empty"><Heart size={32} /><h2>Wishlist dang trong</h2></section>}
+        {!data.length && <section className="empty-state compact-empty"><Heart size={32} /><h2>Wishlist đang trống</h2></section>}
       </section>
     </div>
   );

@@ -42,7 +42,7 @@ export function Layout() {
         <div className="utility-bar">
           <div className="container utility-inner">
             <span>TMDT handmade marketplace</span>
-            <span>COD/VNPay · GHN Standard · Nhieu shop handmade</span>
+            <span>COD/VNPay · GHN Standard · Nhiều shop handmade</span>
           </div>
         </div>
         <div className="container topbar">
@@ -56,19 +56,19 @@ export function Layout() {
           <form className="market-search" onSubmit={handleSearch}>
             <Search size={18} />
             <input
-              aria-label="Tim san pham"
-              placeholder="Tim thiep handmade, qua tang custom, decor..."
+              aria-label="Tìm sản phẩm"
+              placeholder="Tìm thiệp handmade, quà tặng custom, decor..."
               value={keyword}
               onChange={(event) => setKeyword(event.target.value)}
             />
-            <button type="submit">Tim kiem</button>
+            <button type="submit">Tìm kiếm</button>
           </form>
           <nav className="main-nav" aria-label="Main navigation">
             <NavLink to="/" end>
-              <Home size={17} /> San pham
+              <Home size={17} /> Sản phẩm
             </NavLink>
             <NavLink to="/cart">
-              <ShoppingCart size={17} /> Gio hang <span className="cart-pill">{cart.totalQuantity || 0}</span>
+              <ShoppingCart size={17} /> Giỏ hàng <span className="cart-pill">{cart.totalQuantity || 0}</span>
             </NavLink>
             {user ? (
               <>
@@ -79,11 +79,11 @@ export function Layout() {
                   <MessageSquare size={17} /> Chat
                 </NavLink>
                 <NavLink to="/orders">
-                  <ReceiptText size={17} /> Don mua
+                  <ReceiptText size={17} /> Đơn mua
                 </NavLink>
                 {user.shopId && (
                   <NavLink to="/seller">
-                    <Store size={17} /> Kenh ban
+                    <Store size={17} /> Kênh bán
                   </NavLink>
                 )}
                 {user.role === 'ADMIN' && (
@@ -92,36 +92,36 @@ export function Layout() {
                   </NavLink>
                 )}
                 <div className="auth-menu">
-                  <button className="icon-btn header-icon" title="Thong bao" type="button" onClick={() => navigate("/notifications")}>
+                  <button className="icon-btn header-icon" title="Thông báo" type="button" onClick={() => navigate("/notifications")}>
                     <Bell size={17} />
                   </button>
                   <button className="user-greeting plain-user" type="button" onClick={() => navigate("/profile")}>
                     <UserRound size={15} />
                     {user.fullName || 'User'}
                   </button>
-                  <button onClick={handleLogout} className="btn-logout" title="Log Out">
+                  <button onClick={handleLogout} className="btn-logout" title="Đăng xuất">
                     <LogOut size={17} />
                   </button>
                 </div>
               </>
             ) : (
               <NavLink to="/login" className="login-link">
-                <LogIn size={17} /> Login
+                <LogIn size={17} /> Đăng nhập
               </NavLink>
             )}
           </nav>
         </div>
         <div className="category-strip">
           <div className="container category-row">
-            <span><Menu size={16} /> Danh muc</span>
-            <a href="/?category=Thiep%20handmade">Thiep handmade</a>
-            <a href="/?category=Qua%20tang%20custom">Qua tang custom</a>
-            <a href="/?category=Decor%20thu%20cong">Decor thu cong</a>
-            <a href="/cart">Gio hang da shop</a>
-            <a href="/orders">Theo doi don</a>
+            <span><Menu size={16} /> Danh mục</span>
+            <a href="/?category=Thiep%20handmade">Thiệp handmade</a>
+            <a href="/?category=Qua%20tang%20custom">Quà tặng custom</a>
+            <a href="/?category=Decor%20thu%20cong">Decor thủ công</a>
+            <a href="/cart">Giỏ hàng đa shop</a>
+            <a href="/orders">Theo dõi đơn</a>
             <a href="/chat">Chat/quote</a>
-            <a href="/admin/manage">Admin manage</a>
-            <a href="/modules">Full plan modules</a>
+            <a href="/admin/manage">Quản trị</a>
+            <a href="/modules">Tất cả module</a>
           </div>
         </div>
       </header>
@@ -130,7 +130,7 @@ export function Layout() {
       </main>
       <footer className="site-footer">
         <div className="container">
-          <span><Package size={16} /> TMDT Market van hanh don theo tung shop.</span>
+          <span><Package size={16} /> TMDT Market vận hành đơn theo từng shop.</span>
           <span className="footer-note">COD · VNPay · GHN</span>
         </div>
       </footer>

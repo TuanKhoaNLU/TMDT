@@ -32,6 +32,8 @@ public class AuthController {
     record LogoutRequest(String refreshToken) {}
     record GoogleLoginRequest(String email, String fullName) {}
     record MessageResponse(String message, String otp) {}
+    record SellerRegisterRequest(String username, String password, String email, String fullName,
+                                 String shopName, String phone, String description) {}
 
     @PostMapping("/login")
     public LoginResponse login(@RequestBody LoginRequest request) {
@@ -108,6 +110,43 @@ public class AuthController {
         }
 
         return new LoginResponse(null, null, nextUserId, "BUYER", null, request.fullName(), "PENDING");
+    }
+
+    @PostMapping("/register-seller")
+    public MessageResponse registerSeller(@RequestBody SellerRegisterRequest request) {
+        if (request.username() == null || request.username().length() < 3) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Tên đăng nhập phải có ít nhất 3 ký tự");
+        }
+        if (request.password() == null || request.password().length() < 6) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Mật khẩu phải có ít nhất 6 ký tự");
+        }
+        if (request.shopName() == null || request.shopName().isBlank()) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Vui lòng nhập tên shop");
+        }
+
+        Long nextUserId = nextId("Users");
+        Long nextAccountId = nextId("Accounts");
+        Long nextShopId = nextId("Shops");
+        String hash = BCrypt.hashpw(request.password(), BCrypt.gensalt());
+
+        try {
+            jdbcTemplate.update("""
+                    INSERT INTO Users (id, full_name, phone, status)
+                    VALUES (?, ?, ?, 'PENDING_SELLER')
+                    """, nextUserId, request.fullName(), request.phone());
+            jdbcTemplate.update("""
+                    INSERT INTO Accounts (id, user_id, username, password_hash, email, role, status)
+                    VALUES (?, ?, ?, ?, ?, 'SELLER', 0)
+                    """, nextAccountId, nextUserId, request.username(), hash, request.email());
+            jdbcTemplate.update("""
+                    INSERT INTO Shops (id, owner_id, shop_name, description, verified_artisan, status)
+                    VALUES (?, ?, ?, ?, false, 'PENDING')
+                    """, nextShopId, nextUserId, request.shopName(), request.description());
+        } catch (Exception e) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Tên đăng nhập hoặc email đã tồn tại");
+        }
+
+        return new MessageResponse("Đã gửi hồ sơ đăng ký người bán. Vui lòng chờ quản trị viên phê duyệt.", null);
     }
 
     @PostMapping("/verify-otp")

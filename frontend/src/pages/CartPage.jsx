@@ -11,13 +11,13 @@ export default function CartPage() {
   if (loading) {
     return (
       <section className="loading-panel">
-        <Loader2 className="spin" size={22} /> Dang tai gio hang...
+        <Loader2 className="spin" size={22} /> Đang tải giỏ hàng...
       </section>
     );
   }
 
   if (!cart.shops.length) {
-    return <EmptyState title="Gio hang dang trong" />;
+    return <EmptyState title="Giỏ hàng đang trống" />;
   }
 
   return (
@@ -25,11 +25,11 @@ export default function CartPage() {
       <section className="stack">
         <div className="page-head">
           <div>
-            <h1>Gio hang</h1>
-            <p className="muted">San pham duoc gom theo tung shop.</p>
+            <h1>Giỏ hàng</h1>
+            <p className="muted">Sản phẩm được gom theo từng shop.</p>
           </div>
           <button className="btn secondary" onClick={clear}>
-            <Trash2 size={17} /> Xoa tat ca
+            <Trash2 size={17} /> Xóa tất cả
           </button>
         </div>
 
@@ -72,7 +72,7 @@ export default function CartPage() {
                   </button>
                 </div>
                 <strong>{formatMoney(item.lineTotal)}</strong>
-                <button className="icon-btn danger-btn" title="Xoa san pham" onClick={() => removeItem(item.itemKey)}>
+                <button className="icon-btn danger-btn" title="Xóa sản phẩm" onClick={() => removeItem(item.itemKey)}>
                   <Trash2 size={17} />
                 </button>
               </div>
@@ -82,7 +82,7 @@ export default function CartPage() {
       </section>
 
       <aside className="summary-panel">
-        <h2>Tong ket</h2>
+        <h2>Tổng kết</h2>
         <div className="summary-row">
           <span>So luong</span>
           <strong>{cart.totalQuantity}</strong>
@@ -98,11 +98,11 @@ export default function CartPage() {
         <p className="muted">Phi ship tinh o checkout theo tung shop.</p>
         {cart.canCheckout ? (
           <Link className="btn primary full" to="/checkout">
-            Dat hang <ArrowRight size={18} />
+            Đặt hàng <ArrowRight size={18} />
           </Link>
         ) : (
           <button className="btn primary full" disabled>
-            Dat hang <ArrowRight size={18} />
+            Đặt hàng <ArrowRight size={18} />
           </button>
         )}
       </aside>

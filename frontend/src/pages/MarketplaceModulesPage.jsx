@@ -24,7 +24,7 @@ export default function MarketplaceModulesPage() {
   });
 
   if (isLoading) {
-    return <section className="loading-panel"><Loader2 className="spin" size={22} /> Dang tai module plan...</section>;
+    return <section className="loading-panel"><Loader2 className="spin" size={22} /> Đang tải module plan...</section>;
   }
 
   if (error) {

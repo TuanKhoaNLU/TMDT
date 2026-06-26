@@ -18,7 +18,7 @@ export default function VerifyOtpPage() {
       setMessage(response.data.message);
       setTimeout(() => navigate("/login"), 600);
     } catch (err) {
-      setError(err.message || "OTP khong hop le");
+      setError(err.message || "OTP không hợp lệ");
     }
   }
 
@@ -29,10 +29,10 @@ export default function VerifyOtpPage() {
           <span className="brand-mark">T</span>
           <span>TMDT Market<small>Email OTP</small></span>
         </div>
-        <h1>Xac thuc email de active tai khoan buyer</h1>
+        <h1>Xác thực email để kích hoạt tài khoản buyer</h1>
       </section>
       <div className="auth-card">
-        <h2>Xac thuc OTP</h2>
+        <h2>Xác thực OTP</h2>
         <p>Demo local dung ma 123456.</p>
         {error && <div className="alert-error">{error}</div>}
         {message && <div className="alert success">{message}</div>}
@@ -45,10 +45,10 @@ export default function VerifyOtpPage() {
             <label>OTP</label>
             <input value={otp} onChange={(event) => setOtp(event.target.value)} required />
           </div>
-          <button className="btn primary w-100" type="submit">Xac thuc</button>
+          <button className="btn primary w-100" type="submit">Xác thực</button>
         </form>
         <div className="auth-footer">
-          <Link to="/login">Quay lai dang nhap</Link>
+          <Link to="/login">Quay lại đăng nhập</Link>
         </div>
       </div>
     </div>

@@ -11,7 +11,7 @@ export default function ProfilePage() {
   });
 
   if (isLoading) {
-    return <section className="loading-panel"><Loader2 className="spin" size={22} /> Dang tai profile...</section>;
+    return <section className="loading-panel"><Loader2 className="spin" size={22} /> Đang tải hồ sơ...</section>;
   }
 
   const { profile, addresses, wishlist, followedShops } = data;
@@ -33,22 +33,22 @@ export default function ProfilePage() {
 
       <section className="content-grid">
         <article className="panel">
-          <h2><MapPin size={18} /> Dia chi giao hang</h2>
+          <h2><MapPin size={18} /> Địa chỉ giao hàng</h2>
           <div className="stack-list">
             {addresses.map((item) => (
               <div className="soft-row" key={item.id}>
-                <strong>{item.label || "Dia chi"} {item.defaultAddress ? "- Mac dinh" : ""}</strong>
+                <strong>{item.label || "Địa chỉ"} {item.defaultAddress ? "- Mặc định" : ""}</strong>
                 <span>{item.receiverName} - {item.phone}</span>
                 <span className="muted">{item.address}, {item.ward}, {item.district}, {item.province}</span>
               </div>
             ))}
-            {!addresses.length && <p className="muted">Ban chua luu dia chi rieng, checkout van co the nhap truc tiep.</p>}
+            {!addresses.length && <p className="muted">Bạn chưa lưu địa chỉ riêng, checkout vẫn có thể nhập trực tiếp.</p>}
           </div>
         </article>
         <article className="panel">
-          <h2><Trophy size={18} /> Thanh toan va diem</h2>
-          <p className="muted">Lich su thanh toan dang nam trong trang don mua. Diem thuong da san sang de ap dung o cac dot nang cap voucher.</p>
-          <Link className="btn secondary" to="/orders">Xem don mua</Link>
+          <h2><Trophy size={18} /> Thanh toán và điểm</h2>
+          <p className="muted">Lịch sử thanh toán đang nằm trong trang đơn mua. Điểm thưởng đã sẵn sàng để áp dụng ở các đợt nâng cấp voucher.</p>
+          <Link className="btn secondary" to="/orders">Xem đơn mua</Link>
         </article>
       </section>
 
@@ -62,12 +62,12 @@ export default function ProfilePage() {
               <span>{formatMoney(product.price)}</span>
             </Link>
           ))}
-          {!wishlist.length && <p className="muted">Chua co san pham yeu thich.</p>}
+          {!wishlist.length && <p className="muted">Chưa có sản phẩm yêu thích.</p>}
         </div>
       </section>
 
       <section className="panel">
-        <h2><Store size={18} /> Shop dang theo doi</h2>
+        <h2><Store size={18} /> Shop đang theo dõi</h2>
         <div className="stack-list">
           {followedShops.map((shop) => (
             <Link className="soft-row" to={`/shops/${shop.id}`} key={shop.id}>
@@ -75,11 +75,11 @@ export default function ProfilePage() {
               <span className="muted">{shop.description}</span>
             </Link>
           ))}
-          {!followedShops.length && <p className="muted">Chua follow shop nao.</p>}
+          {!followedShops.length && <p className="muted">Chưa follow shop nào.</p>}
         </div>
       </section>
 
-      <Link className="btn secondary" to="/notifications"><Bell size={17} /> Trung tam thong bao</Link>
+      <Link className="btn secondary" to="/notifications"><Bell size={17} /> Trung tâm thông báo</Link>
     </div>
   );
 }

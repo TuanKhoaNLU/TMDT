@@ -47,13 +47,13 @@ export default function CheckoutPage() {
   if (cartLoading || (summaryQuery.isLoading && !summaryQuery.data)) {
     return (
       <section className="loading-panel">
-        <Loader2 className="spin" size={22} /> Dang tinh checkout...
+        <Loader2 className="spin" size={22} /> Đang tính checkout...
       </section>
     );
   }
 
   if (!cart.shops.length) {
-    return <EmptyState title="Can co san pham trong gio hang" />;
+    return <EmptyState title="Can co sản phẩm trong gio hang" />;
   }
 
   const summary = summaryQuery.data;
@@ -69,7 +69,7 @@ export default function CheckoutPage() {
     event.preventDefault();
     setError("");
     if (!cart.shops.length || !cart.canCheckout || !summary?.canCheckout) {
-      setError("Gio hang chua san sang de dat hang.");
+      setError("Giỏ hàng chưa sẵn sàng để đặt hàng.");
       return;
     }
 
@@ -108,10 +108,10 @@ export default function CheckoutPage() {
         <div className="page-head">
           <div>
             <h1>Checkout</h1>
-            <p className="muted">Don co the giao thanh nhieu kien tu nhieu shop.</p>
+            <p className="muted">Đơn có thể giao thành nhiều kiện từ nhiều shop.</p>
           </div>
           <Link className="btn secondary" to="/cart">
-            <ArrowLeft size={17} /> Gio hang
+            <ArrowLeft size={17} /> Giỏ hàng
           </Link>
         </div>
 
@@ -136,7 +136,7 @@ export default function CheckoutPage() {
                 setSelectedWardCode("");
             }}>
               <option value="">Chon Tinh/Thanh</option>
-              {provinces.isLoading && <option value="">Dang tai tu GHN...</option>}
+              {provinces.isLoading && <option value="">Đang tải từ GHN...</option>}
               {provinceOptions.map((item) => (
                 <option key={item.code} value={item.code}>
                   {item.name}
@@ -145,13 +145,13 @@ export default function CheckoutPage() {
             </select>
           </label>
           <label>
-            Quan/Huyen
+            Quận/Hủyện
             <select name="district" required value={selectedDistrictId} onChange={e => {
                 setSelectedDistrictId(e.target.value);
                 setSelectedWardCode("");
             }} disabled={!selectedProvinceId}>
-              <option value="">Chon Quan/Huyen</option>
-              {districts.isLoading && <option value="">Dang tai tu GHN...</option>}
+              <option value="">Chon Quận/Hủyện</option>
+              {districts.isLoading && <option value="">Đang tải từ GHN...</option>}
               {districtOptions.map((item) => (
                 <option key={item.code} value={item.code}>
                   {item.name}
@@ -163,7 +163,7 @@ export default function CheckoutPage() {
             Phuong/Xa
             <select name="ward" required value={selectedWardCode} onChange={e => setSelectedWardCode(e.target.value)} disabled={!selectedDistrictId}>
               <option value="">Chon Phuong/Xa</option>
-              {wards.isLoading && <option value="">Dang tai tu GHN...</option>}
+              {wards.isLoading && <option value="">Đang tải từ GHN...</option>}
               {wardOptions.map((item) => (
                 <option key={item.code} value={item.code}>
                   {item.name}
@@ -172,7 +172,7 @@ export default function CheckoutPage() {
             </select>
           </label>
           <label>
-            Dia chi
+            Địa chỉ
             <input name="address" required placeholder="So nha, ten duong" />
           </label>
         </section>
@@ -186,7 +186,7 @@ export default function CheckoutPage() {
           <label>
             Goi qua
             <select name="giftWrapTierIdInput" value={giftWrapTierId} onChange={(event) => setGiftWrapTierId(event.target.value)}>
-              <option value="">Khong chon goi qua</option>
+              <option value="">Không chọn gói quà</option>
               {(giftWrapTiers.data || []).map((tier) => (
                 <option key={tier.id} value={tier.id}>{tier.name} - {formatMoney(tier.price)}</option>
               ))}
@@ -203,7 +203,7 @@ export default function CheckoutPage() {
         </section>
 
         <section className="form-section">
-          <h2>Thanh toan</h2>
+          <h2>Thanh toán</h2>
           <div className="payment-grid">
             <label>
               <input type="radio" name="paymentMethod" value="VNPAY" defaultChecked />
@@ -217,12 +217,12 @@ export default function CheckoutPage() {
         </section>
 
         <button className="btn primary full" disabled={submitting || summaryQuery.isFetching || !summary?.canCheckout} type="submit">
-          <PackageCheck size={18} /> {submitting ? "Dang tao order..." : "Dat hang"}
+          <PackageCheck size={18} /> {submitting ? "Đang tạo đơn..." : "Đặt hàng"}
         </button>
       </form>
 
       <aside className="summary-panel">
-        <h2>Goi hang</h2>
+        <h2>Gói hàng</h2>
         {summary?.shopSummaries?.map((shop) => (
           <div className="mini-card" key={shop.shopId}>
             <div className="summary-row">
@@ -260,7 +260,7 @@ export default function CheckoutPage() {
           </div>
         )}
         <div className="summary-row total">
-          <span>Tong</span>
+          <span>Tổng</span>
           <strong>{formatMoney(summary?.grandTotal)}</strong>
         </div>
       </aside>

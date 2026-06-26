@@ -637,7 +637,13 @@ public class MarketplaceService {
         }
         BigDecimal discountAmount = calculateVoucherDiscount(request.voucherCode(), summary.subtotal());
         GiftWrapSnapshot giftWrap = findGiftWrap(request.giftWrapTierId());
-        BigDecimal rewardDiscount = money(BigDecimal.valueOf(Math.max(0, request.rewardPointsUsed() == null ? 0 : request.rewardPointsUsed())));
+        int rewardPointsUsed = Math.max(0, request.rewardPointsUsed() == null ? 0 : request.rewardPointsUsed());
+        Integer availableRewardPoints = jdbcTemplate.queryForObject(
+                "SELECT COALESCE(`reward_points`, 0) FROM `Users` WHERE `id` = ?", Integer.class, buyerId);
+        if (rewardPointsUsed > (availableRewardPoints == null ? 0 : availableRewardPoints)) {
+            throw badRequest("Số điểm thưởng sử dụng vượt quá số điểm hiện có.");
+        }
+        BigDecimal rewardDiscount = money(BigDecimal.valueOf(rewardPointsUsed));
         BigDecimal adjustedTotal = money(summary.grandTotal().add(giftWrap.price()).subtract(discountAmount).subtract(rewardDiscount));
         if (adjustedTotal.compareTo(BigDecimal.ZERO) < 0) {
             adjustedTotal = BigDecimal.ZERO;
@@ -676,8 +682,12 @@ public class MarketplaceService {
                 request.giftWrapTierId(),
                 giftWrap.snapshot(),
                 normalize(request.giftMessage()),
-                request.rewardPointsUsed() == null ? 0 : request.rewardPointsUsed(),
+                rewardPointsUsed,
                 normalize(request.idempotencyKey()));
+        if (rewardPointsUsed > 0) {
+            jdbcTemplate.update("UPDATE `Users` SET `reward_points` = GREATEST(COALESCE(`reward_points`, 0) - ?, 0) WHERE `id` = ?",
+                    rewardPointsUsed, buyerId);
+        }
 
         Map<Long, ShopCheckoutSummary> feeByShop = new LinkedHashMap<>();
         for (ShopCheckoutSummary shopSummary : summary.shopSummaries()) {
@@ -1073,6 +1083,52 @@ public class MarketplaceService {
                 """, shopOrderId);
         refreshOrderAggregateStatus(guard.orderId());
         return getSellerOrder(shopId, shopOrderId);
+    }
+
+    @Transactional
+    public ShipmentDetail updateShipmentStatus(Long shipmentId, ShipmentStatusRequest request) {
+        String status = normalize(request.status());
+        if (!StringUtils.hasText(status)) {
+            throw badRequest("Vui lòng nhập trạng thái vận chuyển.");
+        }
+        status = status.toUpperCase();
+        Map<String, Object> row = jdbcTemplate.queryForMap("""
+                SELECT sh.`shop_order_id`, so.`shop_id`, so.`order_id`
+                FROM `shipments` sh
+                JOIN `shop_orders` so ON so.`id` = sh.`shop_order_id`
+                WHERE sh.`id` = ?
+                """, shipmentId);
+        Long shopOrderId = ((Number) row.get("shop_order_id")).longValue();
+        Long shopId = ((Number) row.get("shop_id")).longValue();
+        Long orderId = ((Number) row.get("order_id")).longValue();
+        jdbcTemplate.update("""
+                UPDATE `shipments`
+                SET `status` = ?, `tracking_code` = COALESCE(?, `tracking_code`), `updated_at` = CURRENT_TIMESTAMP
+                WHERE `id` = ?
+                """, status, normalize(request.trackingCode()), shipmentId);
+
+        String shopStatus = switch (status) {
+            case "DELIVERED" -> "COMPLETED";
+            case "FAILED", "RETURNING", "RETURNED" -> "DELIVERY_FAILED";
+            case "IN_TRANSIT", "PICKED", "SHIPPING" -> "SHIPPING";
+            default -> null;
+        };
+        if (shopStatus != null) {
+            jdbcTemplate.update("""
+                    UPDATE `shop_orders`
+                    SET `status` = ?, `updated_at` = CURRENT_TIMESTAMP
+                    WHERE `id` = ?
+                    """, shopStatus, shopOrderId);
+            jdbcTemplate.update("UPDATE `OrderItems` SET `merchant_status` = ? WHERE `shop_order_id` = ?",
+                    shopStatus, shopOrderId);
+            if ("COMPLETED".equals(shopStatus)) {
+                finalizeReservationsForShopOrder(shopOrderId);
+            }
+            refreshOrderAggregateStatus(orderId);
+        }
+        List<ShipmentDetail> shipments = getShipmentsForShopOrder(shopOrderId);
+        return shipments.stream().filter(item -> item.id().equals(shipmentId)).findFirst()
+                .orElseThrow(() -> notFound("Không tìm thấy vận đơn."));
     }
 
     public List<OrderDetailResponse> getAdminOrders() {
@@ -2647,5 +2703,8 @@ public class MarketplaceService {
     }
 
     public record SellerShipmentRequest(String serviceName, String note) {
+    }
+
+    public record ShipmentStatusRequest(String status, String trackingCode) {
     }
 }

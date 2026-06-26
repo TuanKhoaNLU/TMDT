@@ -39,4 +39,11 @@ public class ShippingController {
     public List<MasterDataOption> wards(@RequestParam(required = false) Integer districtId) {
         return marketplaceService.getWards(districtId);
     }
+
+    @PutMapping("/v1/shipping/shipments/{shipmentId}/status")
+    public ShipmentDetail updateShipmentStatus(
+            @PathVariable Long shipmentId,
+            @RequestBody ShipmentStatusRequest request) {
+        return marketplaceService.updateShipmentStatus(shipmentId, request);
+    }
 }

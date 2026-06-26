@@ -20,14 +20,14 @@ export default function PaymentResultPage() {
     return (
       <section className="result-card">
         <XCircle size={40} />
-        <h1>Chua co giao dich</h1>
+        <h1>Chưa có giao dịch</h1>
         {pendingOrderId ? (
           <Link className="btn primary" to={`/orders/${pendingOrderId}`}>
-            Xem don dang cho
+            Xem đơn đang chờ
           </Link>
         ) : (
           <Link className="btn primary" to="/orders">
-            Xem don hang
+            Xem đơn hàng
           </Link>
         )}
       </section>
@@ -37,7 +37,7 @@ export default function PaymentResultPage() {
   if (resultQuery.isLoading) {
     return (
       <section className="loading-panel">
-        <Loader2 className="spin" size={22} /> Dang xac minh thanh toan...
+        <Loader2 className="spin" size={22} /> Đang xác minh thanh toán...
       </section>
     );
   }
@@ -50,10 +50,10 @@ export default function PaymentResultPage() {
   return (
     <section className="result-card">
       {result?.success ? <CheckCircle2 size={44} /> : <XCircle size={44} />}
-      <h1>{result?.success ? "Thanh toan thanh cong" : "Thanh toan that bai"}</h1>
+      <h1>{result?.success ? "Thanh toán thành công" : "Thanh toán thất bại"}</h1>
       <p className="muted">{result?.message}</p>
       <div className="summary-row">
-        <span>Ma don</span>
+        <span>Mã đơn</span>
         <strong>#{result?.orderId}</strong>
       </div>
       <div className="summary-row">
@@ -65,7 +65,7 @@ export default function PaymentResultPage() {
         <StatusBadge status={result?.paymentStatus} />
       </div>
       <Link className="btn primary" to={`/orders/${result?.orderId}`}>
-        Xem don
+        Xem đơn
       </Link>
     </section>
   );

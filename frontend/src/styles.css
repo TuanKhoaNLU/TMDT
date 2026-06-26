@@ -458,6 +458,28 @@ h3 {
   color: var(--primary);
 }
 
+.filter-field {
+  display: grid;
+  gap: 8px;
+}
+
+.filter-field label {
+  color: var(--text);
+  font-size: 13px;
+  font-weight: 800;
+}
+
+.filter-field select,
+.filter-field input {
+  width: 100%;
+}
+
+.price-filter-row {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+
 .trust-block {
   display: grid;
   gap: 10px;
@@ -1712,6 +1734,12 @@ select:focus {
   color: var(--danger);
 }
 
+.alert.success {
+  border-left-color: #12b76a;
+  background: #ecfdf3;
+  color: #027a48;
+}
+
 .self-start {
   align-self: flex-start;
 }
@@ -1848,6 +1876,41 @@ select:focus {
   color: var(--danger);
   padding: 12px;
   font-weight: 700;
+}
+
+.alert-success {
+  margin-bottom: 14px;
+  border-radius: var(--radius);
+  background: #ecfdf3;
+  color: #027a48;
+  padding: 12px;
+  font-weight: 700;
+}
+
+.segmented-control {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+  margin-bottom: 18px;
+}
+
+.segmented-control button {
+  min-height: 42px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  background: var(--surface-soft);
+  color: var(--muted);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  font-weight: 800;
+}
+
+.segmented-control button.active {
+  border-color: var(--primary);
+  background: var(--surface-warm);
+  color: var(--primary);
 }
 
 @media (max-width: 1100px) {

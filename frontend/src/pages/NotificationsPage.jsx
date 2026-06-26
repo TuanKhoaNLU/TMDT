@@ -19,7 +19,7 @@ export default function NotificationsPage() {
   });
 
   if (isLoading) {
-    return <section className="loading-panel"><Loader2 className="spin" size={22} /> Dang tai thong bao...</section>;
+    return <section className="loading-panel"><Loader2 className="spin" size={22} /> Đang tải thông báo...</section>;
   }
 
   return (
@@ -27,8 +27,8 @@ export default function NotificationsPage() {
       <section className="page-head">
         <div>
           <span className="section-kicker"><Bell size={16} /> Notification</span>
-          <h1>Thong bao</h1>
-          <p className="muted">{data.unreadCount} thong bao chua doc</p>
+          <h1>Thông báo</h1>
+          <p className="muted">{data.unreadCount} thông báo chưa đọc</p>
         </div>
         <button className="btn secondary" onClick={() => markAll.mutate()} type="button">
           <CheckCheck size={17} /> Doc tat ca
@@ -43,7 +43,7 @@ export default function NotificationsPage() {
               <small className="muted">{item.type}</small>
             </button>
           ))}
-          {!data.notifications.length && <p className="muted">Chua co thong bao.</p>}
+          {!data.notifications.length && <p className="muted">Chưa có thông báo.</p>}
         </div>
       </section>
     </div>

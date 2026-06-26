@@ -19,20 +19,20 @@ export function formatDate(value) {
 export function statusLabel(status) {
   const labels = {
     PENDING_PAYMENT: "Cho thanh toan",
-    PROCESSING: "Dang xu ly",
+    PROCESSING: "Đang xử lý",
     NEW: "Moi",
-    CONFIRMED: "Da xac nhan",
-    PACKING: "Dang dong goi",
-    SHIPPING: "Dang giao",
+    CONFIRMED: "Đã xác nhận",
+    PACKING: "Đang đóng gói",
+    SHIPPING: "Đang giao",
     COMPLETED: "Hoan tat",
-    CANCELLED: "Da huy",
+    CANCELLED: "Đã hủy",
     DELIVERY_FAILED: "Giao that bai",
-    PAID: "Da thanh toan",
-    PENDING: "Dang cho",
+    PAID: "Đã thanh toán",
+    PENDING: "Đang chờ",
     COD_PENDING: "COD",
     FAILED: "That bai",
     SUCCESS: "Thanh cong",
-    CREATED: "Da tao"
+    CREATED: "Đã tạo"
   };
-  return labels[status] || status || "Khong ro";
+  return labels[status] || status || "Không rõ";
 }

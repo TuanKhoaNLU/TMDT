@@ -53,7 +53,7 @@ export default function CatalogManagementPage() {
   });
 
   if (productsQuery.isLoading || categoriesQuery.isLoading) {
-    return <section className="loading-panel"><Loader2 className="spin" size={22} /> Dang tai catalog...</section>;
+    return <section className="loading-panel"><Loader2 className="spin" size={22} /> Đang tải catalog...</section>;
   }
 
   const products = productsQuery.data || [];
@@ -87,27 +87,27 @@ export default function CatalogManagementPage() {
 
       {!isAdmin && (
         <form className="panel catalog-form" onSubmit={submitProduct}>
-          <h2><PackagePlus size={18} /> Tao listing moi</h2>
-          <input placeholder="Ten san pham" value={productForm.name} onChange={(e) => updateForm("name", e.target.value)} required />
+          <h2><PackagePlus size={18} /> Tạo listing mới</h2>
+          <input placeholder="Tên sản phẩm" value={productForm.name} onChange={(e) => updateForm("name", e.target.value)} required />
           <input placeholder="SKU" value={productForm.sku} onChange={(e) => updateForm("sku", e.target.value)} />
           <select value={productForm.categoryId} onChange={(e) => updateForm("categoryId", e.target.value)}>
             {categories.map((category) => <option key={category.id} value={category.id}>{category.name}</option>)}
           </select>
           <input placeholder="Gia" type="number" value={productForm.price} onChange={(e) => updateForm("price", e.target.value)} required />
-          <input placeholder="Ton kho" type="number" value={productForm.stock} onChange={(e) => updateForm("stock", e.target.value)} />
+          <input placeholder="Tồn kho" type="number" value={productForm.stock} onChange={(e) => updateForm("stock", e.target.value)} />
           <input placeholder="Nguong canh bao ton" type="number" value={productForm.lowStockAlert} onChange={(e) => updateForm("lowStockAlert", e.target.value)} />
           <input placeholder="Tag" value={productForm.tags} onChange={(e) => updateForm("tags", e.target.value)} />
           <input placeholder="Image URL" value={productForm.imageUrl} onChange={(e) => updateForm("imageUrl", e.target.value)} />
           <textarea placeholder="Mo ta" value={productForm.description} onChange={(e) => updateForm("description", e.target.value)} />
           <label className="check-row">
             <input type="checkbox" checked={productForm.customizable} onChange={(e) => updateForm("customizable", e.target.checked)} />
-            San pham custom
+            Sản phẩm custom
           </label>
           <label className="check-row">
             <input type="checkbox" checked={productForm.requiresPersonalization} onChange={(e) => updateForm("requiresPersonalization", e.target.checked)} />
             Bat buoc nhap ca nhan hoa khi mua
           </label>
-          <button className="btn primary" type="submit">Gui admin duyet</button>
+          <button className="btn primary" type="submit">Gửi admin duyet</button>
         </form>
       )}
 
@@ -119,13 +119,13 @@ export default function CatalogManagementPage() {
             if (categoryName.trim()) createCategory.mutate({ name: categoryName, status: "ACTIVE" });
           }}
         >
-          <input placeholder="Them danh muc moi" value={categoryName} onChange={(e) => setCategoryName(e.target.value)} />
-          <button className="btn primary" type="submit">Them danh muc</button>
+          <input placeholder="Thêm danh mục mới" value={categoryName} onChange={(e) => setCategoryName(e.target.value)} />
+          <button className="btn primary" type="submit">Thêm danh mục</button>
         </form>
       )}
 
       <section className="panel">
-        <h2>Danh sach san pham</h2>
+        <h2>Danh sách sản phẩm</h2>
         <div className="stack-list">
           {products.map((product) => (
             <div className="catalog-row" key={product.id}>
@@ -151,18 +151,18 @@ export default function CatalogManagementPage() {
               )}
             </div>
           ))}
-          {!products.length && <p className="muted">Chua co san pham.</p>}
+          {!products.length && <p className="muted">Chưa có sản phẩm.</p>}
         </div>
       </section>
 
       {isAdmin && (
         <section className="panel">
-          <h2><ShieldCheck size={18} /> Danh muc</h2>
+          <h2><ShieldCheck size={18} /> Danh mục</h2>
           <div className="stack-list">
             {categories.map((category) => (
               <div className="soft-row" key={category.id}>
                 <strong>{category.name} - {category.status}</strong>
-                <span>{category.slug} - {category.productCount} san pham</span>
+                <span>{category.slug} - {category.productCount} sản phẩm</span>
               </div>
             ))}
           </div>

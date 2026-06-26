@@ -26,7 +26,7 @@ export default function MediaLibraryPage() {
   });
 
   if (folders.isLoading || images.isLoading) {
-    return <section className="loading-panel"><Loader2 className="spin" size={22} /> Dang tai media...</section>;
+    return <section className="loading-panel"><Loader2 className="spin" size={22} /> Đang tải media...</section>;
   }
 
   return (
@@ -35,7 +35,7 @@ export default function MediaLibraryPage() {
         <div>
           <span className="section-kicker"><Image size={16} /> Media Library</span>
           <h1>Thu vien anh</h1>
-          <p className="muted">Quan ly folder va anh URL cho product/chat/custom order.</p>
+          <p className="muted">Quản lý thư mục và ảnh URL cho sản phẩm/chat/đơn custom.</p>
         </div>
       </section>
 
@@ -56,7 +56,7 @@ export default function MediaLibraryPage() {
           </select>
           <input placeholder="Image URL" value={image.url} onChange={(event) => setImage({ ...image, url: event.target.value })} />
           <input placeholder="Alt text" value={image.altText} onChange={(event) => setImage({ ...image, altText: event.target.value })} />
-          <button className="btn primary" type="submit">Them anh</button>
+          <button className="btn primary" type="submit">Thêm ảnh</button>
         </form>
       </section>
 

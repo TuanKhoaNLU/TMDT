@@ -23,7 +23,7 @@ export default function AdminOrdersPage() {
   if (isLoading) {
     return (
       <section className="loading-panel">
-        <Loader2 className="spin" size={22} /> Dang tai admin orders...
+        <Loader2 className="spin" size={22} /> Đang tải đơn quản trị...
       </section>
     );
   }
@@ -44,7 +44,7 @@ export default function AdminOrdersPage() {
       {actionError && <section className="alert error">{actionError}</section>}
 
       {!orders.length ? (
-        <EmptyState title="Chua co order" action={false} />
+        <EmptyState title="Chưa có đơn hàng" action={false} />
       ) : (
         orders.map((order) => {
           const canCancel =
@@ -83,7 +83,7 @@ export default function AdminOrdersPage() {
 
               {canCancel && (
                 <button className="btn secondary self-start" disabled={cancelOrder.isPending} onClick={() => cancelOrder.mutate(order.id)}>
-                  <XCircle size={17} /> Huy don
+                  <XCircle size={17} /> Hủy đơn
                 </button>
               )}
 

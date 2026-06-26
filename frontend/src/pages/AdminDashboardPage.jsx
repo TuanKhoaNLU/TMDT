@@ -11,7 +11,7 @@ export default function AdminDashboardPage() {
   });
 
   if (isLoading) {
-    return <section className="loading-panel"><Loader2 className="spin" size={22} /> Dang tai admin...</section>;
+    return <section className="loading-panel"><Loader2 className="spin" size={22} /> Đang tải admin...</section>;
   }
 
   const stats = [
@@ -28,13 +28,13 @@ export default function AdminDashboardPage() {
       <section className="page-head">
         <div>
           <span className="section-kicker"><ShieldCheck size={16} /> Admin Dashboard</span>
-          <h1>Tong quan marketplace</h1>
-          <p className="muted">So lieu van hanh, doanh thu va moderation theo plan.</p>
+          <h1>Tổng quan marketplace</h1>
+          <p className="muted">Số liệu vận hành, doanh thu và moderation theo kế hoạch.</p>
         </div>
         <div className="detail-actions">
-          <Link className="btn secondary" to="/admin/manage">Quan ly tong</Link>
-          <Link className="btn secondary" to="/admin/catalog">Duyet catalog</Link>
-          <Link className="btn primary" to="/admin/orders">Quan ly orders</Link>
+          <Link className="btn secondary" to="/admin/manage">Quản lý tổng</Link>
+          <Link className="btn secondary" to="/admin/catalog">Duyệt catalog</Link>
+          <Link className="btn primary" to="/admin/orders">Quản lý đơn hàng</Link>
         </div>
       </section>
       <section className="metric-grid">

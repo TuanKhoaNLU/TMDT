@@ -43,7 +43,7 @@ export default function ChatPage() {
   });
 
   if (conversationsQuery.isLoading) {
-    return <section className="loading-panel"><Loader2 className="spin" size={22} /> Dang tai chat...</section>;
+    return <section className="loading-panel"><Loader2 className="spin" size={22} /> Đang tải chat...</section>;
   }
 
   return (
@@ -66,10 +66,10 @@ export default function ChatPage() {
               type="button"
             >
               <strong>{conversation.shopName}</strong>
-              <span>{conversation.lastMessage || "Chua co tin nhan"}</span>
+              <span>{conversation.lastMessage || "Chưa có tin nhan"}</span>
             </button>
           ))}
-          {!conversations.length && <p className="muted">Chua co conversation.</p>}
+          {!conversations.length && <p className="muted">Chưa có conversation.</p>}
         </aside>
 
         <main className="chat-thread panel">
@@ -95,7 +95,7 @@ export default function ChatPage() {
                 }}
               >
                 <input value={body} onChange={(event) => setBody(event.target.value)} placeholder="Nhap tin nhan" />
-                <button className="btn primary" type="submit"><Send size={16} /> Gui</button>
+                <button className="btn primary" type="submit"><Send size={16} /> Gửi</button>
               </form>
 
               {user?.role === "SELLER" && (
@@ -106,11 +106,11 @@ export default function ChatPage() {
                     if (quote.title.trim()) sendQuote.mutate();
                   }}
                 >
-                  <h2><ShoppingBag size={18} /> Gui custom quote</h2>
+                  <h2><ShoppingBag size={18} /> Gửi custom quote</h2>
                   <input placeholder="Tieu de bao gia" value={quote.title} onChange={(event) => setQuote({ ...quote, title: event.target.value })} />
                   <input placeholder="Mo ta" value={quote.description} onChange={(event) => setQuote({ ...quote, description: event.target.value })} />
                   <input placeholder="Gia" type="number" value={quote.price} onChange={(event) => setQuote({ ...quote, price: event.target.value })} />
-                  <button className="btn secondary" type="submit">Gui offer {quote.price ? formatMoney(Number(quote.price)) : ""}</button>
+                  <button className="btn secondary" type="submit">Gửi offer {quote.price ? formatMoney(Number(quote.price)) : ""}</button>
                 </form>
               )}
             </>

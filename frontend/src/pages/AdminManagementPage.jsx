@@ -40,7 +40,7 @@ export default function AdminManagementPage() {
   });
 
   if (users.isLoading || reports.isLoading || reviews.isLoading || settings.isLoading || reliability.isLoading) {
-    return <section className="loading-panel"><Loader2 className="spin" size={22} /> Dang tai admin management...</section>;
+    return <section className="loading-panel"><Loader2 className="spin" size={22} /> Đang tải quản trị...</section>;
   }
 
   return (
@@ -48,7 +48,7 @@ export default function AdminManagementPage() {
       <section className="page-head">
         <div>
           <span className="section-kicker"><ShieldCheck size={16} /> Admin Management</span>
-          <h1>Quan ly marketplace</h1>
+          <h1>Quản lý marketplace</h1>
           <p className="muted">Users, reports, reviews, settings va payment reliability.</p>
         </div>
       </section>
@@ -71,7 +71,7 @@ export default function AdminManagementPage() {
               <option value="SELLER">SELLER</option>
               <option value="ADMIN">ADMIN</option>
             </select>
-            <button className="btn primary" type="submit">Tao user</button>
+            <button className="btn primary" type="submit">Tạo user</button>
           </form>
           <div className="stack-list">
             {(users.data || []).map((user) => (
@@ -123,8 +123,8 @@ export default function AdminManagementPage() {
               <div className="soft-row" key={review.id}>
                 <strong>{review.productName} - {review.rating}/5</strong>
                 <span>{review.comment}</span>
-                <small className="muted">Shop reply: {review.sellerReply || "Chua co"}</small>
-                <button className="btn secondary" onClick={() => replyReview.mutate({ reviewId: review.id, reply: "Cam on ban da danh gia san pham." })} type="button">
+                <small className="muted">Shop reply: {review.sellerReply || "Chưa có"}</small>
+                <button className="btn secondary" onClick={() => replyReview.mutate({ reviewId: review.id, reply: "Cảm ơn bạn đã đánh giá sản phẩm." })} type="button">
                   Reply mau
                 </button>
               </div>

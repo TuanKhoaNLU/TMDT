@@ -12,7 +12,7 @@ export default function CustomOrdersPage() {
   });
 
   if (isLoading) {
-    return <section className="loading-panel"><Loader2 className="spin" size={22} /> Dang tai custom orders...</section>;
+    return <section className="loading-panel"><Loader2 className="spin" size={22} /> Đang tải đơn custom...</section>;
   }
 
   return (
@@ -20,8 +20,8 @@ export default function CustomOrdersPage() {
       <section className="page-head">
         <div>
           <span className="section-kicker"><ShoppingBag size={16} /> Custom Orders</span>
-          <h1>Don dat lam rieng</h1>
-          <p className="muted">Theo doi quote, crafting, finishing, shipped va delivered.</p>
+          <h1>Đơn đặt làm riêng</h1>
+          <p className="muted">Theo dõi báo giá, chế tác, hoàn thiện, vận chuyển và giao hàng.</p>
         </div>
       </section>
       <section className="panel">
@@ -40,7 +40,7 @@ export default function CustomOrdersPage() {
               </div>
             </div>
           ))}
-          {!data.length && <p className="muted">Chua co custom order.</p>}
+          {!data.length && <p className="muted">Chưa có custom order.</p>}
         </div>
       </section>
     </div>

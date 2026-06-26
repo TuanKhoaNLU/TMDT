@@ -1,5 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Check, Loader2, PackageCheck, Truck, XCircle } from "lucide-react";
+import { Check, Loader2, PackageCheck, Truck, Undo2, XCircle } from "lucide-react";
 import { useState } from "react";
 import { marketplaceApi } from "../api/marketplaceApi";
 import { EmptyState } from "../components/EmptyState";
@@ -13,56 +13,104 @@ export default function SellerOrdersPage() {
     queryKey: ["seller-orders"],
     queryFn: marketplaceApi.sellerOrders
   });
+  const { data: returns = [] } = useQuery({
+    queryKey: ["seller-returns"],
+    queryFn: marketplaceApi.sellerReturns
+  });
+
+  const refresh = () => {
+    queryClient.invalidateQueries({ queryKey: ["seller-orders"] });
+    queryClient.invalidateQueries({ queryKey: ["seller-returns"] });
+  };
 
   const updateStatus = useMutation({
     mutationFn: ({ shopOrderId, status }) => marketplaceApi.updateSellerOrderStatus(shopOrderId, status),
     onMutate: () => setActionError(""),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["seller-orders"] }),
+    onSuccess: refresh,
     onError: (err) => setActionError(err.message)
   });
-
   const createShipment = useMutation({
     mutationFn: (shopOrderId) => marketplaceApi.createGhnShipment(shopOrderId),
     onMutate: () => setActionError(""),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["seller-orders"] }),
+    onSuccess: refresh,
+    onError: (err) => setActionError(err.message)
+  });
+  const updateReturn = useMutation({
+    mutationFn: ({ returnId, status }) => marketplaceApi.updateSellerReturn(returnId, { status }),
+    onMutate: () => setActionError(""),
+    onSuccess: refresh,
     onError: (err) => setActionError(err.message)
   });
 
   if (isLoading) {
     return (
       <section className="loading-panel">
-        <Loader2 className="spin" size={22} /> Dang tai don shop...
+        <Loader2 className="spin" size={22} /> Đang tải đơn shop...
       </section>
     );
   }
 
-  if (error) {
-    return <section className="alert error">{error.message}</section>;
-  }
+  if (error) return <section className="alert error">{error.message}</section>;
 
   return (
     <div className="stack">
       <section className="page-head">
         <div>
-          <h1>Seller orders</h1>
-          <p className="muted">Shop chi thay don cua shop hien tai.</p>
+          <h1>Đơn hàng của shop</h1>
+          <p className="muted">Shop chỉ thấy đơn, vận đơn và yêu cầu hoàn trả của shop hiện tại.</p>
         </div>
       </section>
       {actionError && <section className="alert error">{actionError}</section>}
 
+      {!!returns.length && (
+        <section className="detail-panel">
+          <div className="section-title-row">
+            <div>
+              <span className="section-kicker"><Undo2 size={15} /> Hoàn trả</span>
+              <h2>Yêu cầu hoàn trả/hoàn tiền</h2>
+            </div>
+          </div>
+          <div className="stack compact-stack">
+            {returns.map((item) => (
+              <article className="order-card compact-order" key={item.id}>
+                <div>
+                  <h3>Yêu cầu #{item.id} · Đơn #{item.orderId}</h3>
+                  <p className="muted">{item.reason}</p>
+                  <p className="muted">Số tiền dự kiến: {formatMoney(item.refundAmount)}</p>
+                  <StatusBadge status={item.status} />
+                </div>
+                <div className="card-actions wrap">
+                  {item.status === "REQUESTED" && (
+                    <>
+                      <button className="btn secondary" disabled={updateReturn.isPending} onClick={() => updateReturn.mutate({ returnId: item.id, status: "APPROVED" })}>
+                        <Check size={17} /> Duyệt
+                      </button>
+                      <button className="btn secondary" disabled={updateReturn.isPending} onClick={() => updateReturn.mutate({ returnId: item.id, status: "REJECTED" })}>
+                        <XCircle size={17} /> Từ chối
+                      </button>
+                    </>
+                  )}
+                  {item.status === "APPROVED" && (
+                    <button className="btn primary" disabled={updateReturn.isPending} onClick={() => updateReturn.mutate({ returnId: item.id, status: "REFUNDED" })}>
+                      <Undo2 size={17} /> Đã hoàn tiền
+                    </button>
+                  )}
+                </div>
+              </article>
+            ))}
+          </div>
+        </section>
+      )}
+
       {!orders.length ? (
-        <EmptyState title="Shop chua co don" action={false} />
+        <EmptyState title="Shop chưa có đơn" action={false} />
       ) : (
         orders.map((order) => (
           <article className="order-card seller-card" key={order.shopOrderId}>
             <div>
-              <h2>Shop order #{order.shopOrderId}</h2>
-              <p className="muted">
-                Order #{order.orderId} - {formatDate(order.createdAt)}
-              </p>
-              <p className="muted">
-                {order.receiverName} - {order.shippingAddress}
-              </p>
+              <h2>Đơn shop #{order.shopOrderId}</h2>
+              <p className="muted">Đơn #{order.orderId} - {formatDate(order.createdAt)}</p>
+              <p className="muted">{order.receiverName} - {order.shippingAddress}</p>
               <div className="badge-row">
                 <StatusBadge status={order.status} />
                 <StatusBadge status={order.paymentStatus} />
@@ -72,20 +120,12 @@ export default function SellerOrdersPage() {
             <div className="stack compact-stack">
               {order.items.map((item) => (
                 <div className="summary-row" key={item.id}>
-                  <span>
-                    {item.productName} x {item.quantity}
-                  </span>
+                  <span>{item.productName} x {item.quantity}</span>
                   <strong>{formatMoney(item.lineTotal)}</strong>
                 </div>
               ))}
-              <div className="summary-row">
-                <span>Phi ship</span>
-                <strong>{formatMoney(order.shippingFee)}</strong>
-              </div>
-              <div className="summary-row">
-                <span>COD</span>
-                <strong>{formatMoney(order.codAmount)}</strong>
-              </div>
+              <div className="summary-row"><span>Phí ship</span><strong>{formatMoney(order.shippingFee)}</strong></div>
+              <div className="summary-row"><span>COD</span><strong>{formatMoney(order.codAmount)}</strong></div>
             </div>
 
             <div className="shipment-list">
@@ -113,12 +153,8 @@ export default function SellerOrdersPage() {
                 );
               })}
               {order.status === "PACKING" && (
-                <button
-                  className="btn primary"
-                  disabled={updateStatus.isPending || createShipment.isPending}
-                  onClick={() => createShipment.mutate(order.shopOrderId)}
-                >
-                  <Truck size={17} /> Tao GHN
+                <button className="btn primary" disabled={updateStatus.isPending || createShipment.isPending} onClick={() => createShipment.mutate(order.shopOrderId)}>
+                  <Truck size={17} /> Tạo GHN
                 </button>
               )}
             </div>
@@ -134,20 +170,20 @@ function sellerActionsFor(order) {
   switch (order.status) {
     case "NEW":
       return [
-        { status: "CONFIRMED", label: "Xac nhan", icon: Check },
-        ...(canCancel ? [{ status: "CANCELLED", label: "Huy", icon: XCircle }] : [])
+        { status: "CONFIRMED", label: "Xác nhận", icon: Check },
+        ...(canCancel ? [{ status: "CANCELLED", label: "Hủy", icon: XCircle }] : [])
       ];
     case "CONFIRMED":
       return [
-        { status: "PACKING", label: "Dong goi", icon: PackageCheck },
-        ...(canCancel ? [{ status: "CANCELLED", label: "Huy", icon: XCircle }] : [])
+        { status: "PACKING", label: "Đóng gói", icon: PackageCheck },
+        ...(canCancel ? [{ status: "CANCELLED", label: "Hủy", icon: XCircle }] : [])
       ];
     case "PACKING":
-      return canCancel ? [{ status: "CANCELLED", label: "Huy", icon: XCircle }] : [];
+      return canCancel ? [{ status: "CANCELLED", label: "Hủy", icon: XCircle }] : [];
     case "SHIPPING":
       return [
-        { status: "COMPLETED", label: "Hoan tat", icon: Check },
-        { status: "DELIVERY_FAILED", label: "Giao that bai", icon: XCircle }
+        { status: "COMPLETED", label: "Hoàn tất", icon: Check },
+        { status: "DELIVERY_FAILED", label: "Giao thất bại", icon: XCircle }
       ];
     default:
       return [];

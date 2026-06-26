@@ -164,4 +164,25 @@ public class SellerController {
             @RequestBody SellerShipmentRequest request) {
         return marketplaceService.createGhnShipment(requestGuard.requireSellerShopId(shopId, tokenShopId, tokenUserId, role), shopOrderId, request);
     }
+
+    @GetMapping("/v1/seller/returns")
+    public List<ReturnRequestSummary> sellerReturns(
+            @RequestHeader(value = "X-Shop-Id", required = false) Long shopId,
+            @RequestAttribute(value = "shopId", required = false) Long tokenShopId,
+            @RequestAttribute(value = "userId", required = false) Long tokenUserId,
+            @RequestAttribute(value = "role", required = false) String role) {
+        return marketplaceModuleService.listReturnRequests(null, requestGuard.requireSellerShopId(shopId, tokenShopId, tokenUserId, role));
+    }
+
+    @PutMapping("/v1/seller/returns/{returnId}")
+    public ReturnRequestSummary updateSellerReturn(
+            @RequestHeader(value = "X-Shop-Id", required = false) Long shopId,
+            @RequestAttribute(value = "shopId", required = false) Long tokenShopId,
+            @RequestAttribute(value = "userId", required = false) Long tokenUserId,
+            @RequestAttribute(value = "role", required = false) String role,
+            @PathVariable Long returnId,
+            @RequestBody ReturnUpdateRequest request) {
+        Long sellerShopId = requestGuard.requireSellerShopId(shopId, tokenShopId, tokenUserId, role);
+        return marketplaceModuleService.updateReturnRequest(returnId, request, sellerShopId);
+    }
 }

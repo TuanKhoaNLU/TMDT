@@ -209,8 +209,88 @@ public class MarketplaceModuleService {
     }
 
     public AdminUserSummary verifySeller(Long userId, boolean verified) {
-        jdbcTemplate.update("UPDATE `Shops` SET `verified_artisan` = ? WHERE `owner_id` = ?", verified, userId);
+        jdbcTemplate.update("UPDATE `Shops` SET `verified_artisan` = ?, `status` = ? WHERE `owner_id` = ?",
+                verified, verified ? "ACTIVE" : "PENDING", userId);
+        jdbcTemplate.update("UPDATE `Users` SET `status` = ? WHERE `id` = ?",
+                verified ? "ACTIVE" : "PENDING_SELLER", userId);
+        jdbcTemplate.update("UPDATE `Accounts` SET `role` = 'SELLER', `status` = ? WHERE `user_id` = ?",
+                verified ? 1 : 0, userId);
         return listAdminUsers().stream().filter(user -> user.id().equals(userId)).findFirst().orElseThrow();
+    }
+
+    @Transactional
+    public ReturnRequestSummary createReturnRequest(Long buyerId, Long orderId, Long shopOrderId, ReturnRequest request) {
+        requireText(request.reason(), "Vui lòng nhập lý do hoàn trả.");
+        Map<String, Object> row = jdbcTemplate.queryForMap("""
+                SELECT o.`buyer_id`, so.`shop_id`,
+                       COALESCE(so.`item_subtotal`, 0) + COALESCE(so.`shipping_fee`, 0) AS refund_amount,
+                       so.`status`
+                FROM `Orders` o
+                JOIN `shop_orders` so ON so.`order_id` = o.`id`
+                WHERE o.`id` = ? AND so.`id` = ?
+                """, orderId, shopOrderId);
+        long ownerId = ((Number) row.get("buyer_id")).longValue();
+        if (ownerId != buyerId) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Bạn không có quyền yêu cầu hoàn trả đơn này.");
+        }
+        String status = String.valueOf(row.get("status"));
+        if (!List.of("COMPLETED", "DELIVERED").contains(status.toUpperCase())) {
+            throw badRequest("Chỉ có thể yêu cầu hoàn trả sau khi đơn đã giao hoặc hoàn tất.");
+        }
+        if (count("SELECT COUNT(*) FROM `return_requests` WHERE `shop_order_id` = ? AND `status` IN ('REQUESTED','APPROVED')", shopOrderId) > 0) {
+            throw badRequest("Yêu cầu hoàn trả cho kiện hàng này đang được xử lý.");
+        }
+        long id = nextId("return_requests");
+        jdbcTemplate.update("""
+                INSERT INTO `return_requests` (`id`, `order_id`, `shop_order_id`, `buyer_id`, `shop_id`,
+                  `reason`, `status`, `refund_amount`)
+                VALUES (?, ?, ?, ?, ?, ?, 'REQUESTED', ?)
+                """, id, orderId, shopOrderId, buyerId, row.get("shop_id"), request.reason(), money((BigDecimal) row.get("refund_amount")));
+        return getReturnRequest(id);
+    }
+
+    public List<ReturnRequestSummary> listReturnRequests(Long buyerId, Long shopId) {
+        StringBuilder sql = new StringBuilder("""
+                SELECT rr.`id`, rr.`order_id`, rr.`shop_order_id`, rr.`buyer_id`, rr.`shop_id`,
+                       COALESCE(s.`shop_name`, '') AS shop_name,
+                       rr.`reason`, rr.`status`, rr.`refund_amount`, rr.`admin_note`, rr.`created_at`, rr.`updated_at`
+                FROM `return_requests` rr
+                LEFT JOIN `Shops` s ON s.`id` = rr.`shop_id`
+                WHERE 1 = 1
+                """);
+        if (buyerId != null) {
+            return jdbcTemplate.query(sql + " AND rr.`buyer_id` = ? ORDER BY rr.`created_at` DESC",
+                    this::mapReturnRequest, buyerId);
+        }
+        if (shopId != null) {
+            return jdbcTemplate.query(sql + " AND rr.`shop_id` = ? ORDER BY rr.`created_at` DESC",
+                    this::mapReturnRequest, shopId);
+        }
+        return jdbcTemplate.query(sql + " ORDER BY rr.`created_at` DESC", this::mapReturnRequest);
+    }
+
+    @Transactional
+    public ReturnRequestSummary updateReturnRequest(Long returnId, ReturnUpdateRequest request, Long shopId) {
+        ReturnRequestSummary current = getReturnRequest(returnId);
+        if (shopId != null && !shopId.equals(current.shopId())) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Bạn không có quyền xử lý yêu cầu hoàn trả này.");
+        }
+        String status = request.status() == null ? current.status() : request.status().trim().toUpperCase();
+        if (!List.of("REQUESTED", "APPROVED", "REJECTED", "REFUNDED").contains(status)) {
+            throw badRequest("Trạng thái hoàn trả không hợp lệ.");
+        }
+        jdbcTemplate.update("""
+                UPDATE `return_requests`
+                SET `status` = ?, `admin_note` = COALESCE(?, `admin_note`), `updated_at` = CURRENT_TIMESTAMP
+                WHERE `id` = ?
+                """, status, request.adminNote(), returnId);
+        if ("REFUNDED".equals(status)) {
+            jdbcTemplate.update("UPDATE `shop_orders` SET `status` = 'RETURNED', `updated_at` = CURRENT_TIMESTAMP WHERE `id` = ?",
+                    current.shopOrderId());
+            jdbcTemplate.update("UPDATE `OrderItems` SET `merchant_status` = 'RETURNED' WHERE `shop_order_id` = ?",
+                    current.shopOrderId());
+        }
+        return getReturnRequest(returnId);
     }
 
     public List<ReviewModerationSummary> listReviews(Long shopId) {
@@ -891,6 +971,34 @@ public class MarketplaceModuleService {
                 rs.getString("transaction_id"), money(rs.getBigDecimal("amount")), rs.getString("status"));
     }
 
+    private ReturnRequestSummary getReturnRequest(Long returnId) {
+        return jdbcTemplate.queryForObject("""
+                SELECT rr.`id`, rr.`order_id`, rr.`shop_order_id`, rr.`buyer_id`, rr.`shop_id`,
+                       COALESCE(s.`shop_name`, '') AS shop_name,
+                       rr.`reason`, rr.`status`, rr.`refund_amount`, rr.`admin_note`, rr.`created_at`, rr.`updated_at`
+                FROM `return_requests` rr
+                LEFT JOIN `Shops` s ON s.`id` = rr.`shop_id`
+                WHERE rr.`id` = ?
+                """, this::mapReturnRequest, returnId);
+    }
+
+    private ReturnRequestSummary mapReturnRequest(ResultSet rs, int rowNum) throws SQLException {
+        return new ReturnRequestSummary(
+                rs.getLong("id"),
+                rs.getLong("order_id"),
+                nullableLong(rs, "shop_order_id"),
+                rs.getLong("buyer_id"),
+                nullableLong(rs, "shop_id"),
+                rs.getString("shop_name"),
+                rs.getString("reason"),
+                rs.getString("status"),
+                money(rs.getBigDecimal("refund_amount")),
+                rs.getString("admin_note"),
+                time(rs.getTimestamp("created_at")),
+                time(rs.getTimestamp("updated_at"))
+        );
+    }
+
     private Long nullableLong(ResultSet rs, String column) throws SQLException {
         long value = rs.getLong(column);
         return rs.wasNull() ? null : value;
@@ -974,6 +1082,11 @@ public class MarketplaceModuleService {
     public record ReportRequest(String type, Long targetId, String reason) {}
     public record ReportUpdateRequest(String status, String adminNote) {}
     public record PaymentHistorySummary(Long id, Long orderId, String method, String transactionId, BigDecimal amount, String status) {}
+    public record ReturnRequestSummary(Long id, Long orderId, Long shopOrderId, Long buyerId, Long shopId,
+                                       String shopName, String reason, String status, BigDecimal refundAmount,
+                                       String adminNote, LocalDateTime createdAt, LocalDateTime updatedAt) {}
+    public record ReturnRequest(String reason) {}
+    public record ReturnUpdateRequest(String status, String adminNote) {}
     public record AnalyticsPoint(String label, BigDecimal value) {}
     public record SellerAnalyticsResponse(BigDecimal revenue, int orderCount, int reviewCount, int lowStockCount,
                                           List<AnalyticsPoint> revenueByCategory,
