@@ -351,9 +351,32 @@ public class MarketplaceService {
         }
     }
 
+    public ReviewEligibilityResponse getReviewEligibility(Long userIdHeader, Long productId) {
+        long userId = buyerIdOrDefault(userIdHeader);
+        boolean purchased = exists("""
+                SELECT COUNT(*)
+                FROM `Orders` o
+                JOIN `OrderItems` oi ON oi.`order_id` = o.`id`
+                WHERE o.`buyer_id` = ? AND oi.`product_id` = ?
+                  AND (UPPER(COALESCE(oi.`merchant_status`, '')) = 'COMPLETED'
+                       OR UPPER(COALESCE(o.`status`, '')) = 'COMPLETED')
+                """, userId, productId);
+        boolean reviewed = exists("SELECT COUNT(*) FROM `product_reviews` WHERE `user_id` = ? AND `product_id` = ?",
+                userId, productId);
+        String reason = !purchased
+                ? "Bạn chỉ có thể đánh giá sau khi đơn hàng đã hoàn tất."
+                : reviewed ? "Bạn đã đánh giá sản phẩm này." : "Bạn có thể đánh giá sản phẩm.";
+        return new ReviewEligibilityResponse(purchased && !reviewed, purchased, reviewed, reason);
+    }
+
+    @Transactional
     public ReviewSummary addReview(Long userIdHeader, Long productId, ReviewRequest request) {
         long userId = buyerIdOrDefault(userIdHeader);
         ProductRow product = findProduct(productId).orElseThrow(() -> notFound("Khong tim thay san pham."));
+        ReviewEligibilityResponse eligibility = getReviewEligibility(userId, productId);
+        if (!eligibility.eligible()) {
+            throw badRequest(eligibility.reason());
+        }
         int rating = request.rating() == null ? 5 : request.rating();
         if (rating < 1 || rating > 5) {
             throw badRequest("Rating phai tu 1 den 5.");
@@ -694,10 +717,11 @@ public class MarketplaceService {
             feeByShop.put(shopSummary.shopId(), shopSummary);
         }
 
+        BigDecimal effectiveCommissionRate = resolveCommissionRate();
         for (ShopCartGroup group : cart.shops()) {
             ShopCheckoutSummary shopSummary = feeByShop.get(group.shopId());
             long shopOrderId = nextId("shop_orders");
-            BigDecimal commission = money(group.subtotal().multiply(commissionRate));
+            BigDecimal commission = money(group.subtotal().multiply(effectiveCommissionRate));
             BigDecimal payout = money(group.subtotal().subtract(commission));
             BigDecimal codAmount = "COD".equals(paymentMethod) ? shopSummary.total() : BigDecimal.ZERO;
             String shopStatus = "VNPAY".equals(paymentMethod) ? "PENDING_PAYMENT" : "NEW";
@@ -1979,6 +2003,25 @@ public class MarketplaceService {
         }
     }
 
+    private BigDecimal resolveCommissionRate() {
+        try {
+            String rawBps = jdbcTemplate.queryForObject("""
+                    SELECT `setting_value`
+                    FROM `platform_settings`
+                    WHERE `setting_key` = 'commission_bps'
+                    """, String.class);
+            if (StringUtils.hasText(rawBps)) {
+                int bps = Integer.parseInt(rawBps.trim());
+                if (bps >= 0 && bps <= 5000) {
+                    return BigDecimal.valueOf(bps).divide(BigDecimal.valueOf(10_000), 6, RoundingMode.HALF_UP);
+                }
+            }
+        } catch (DataAccessException | NumberFormatException ignored) {
+            // Fall back to application configuration when the setting is unavailable.
+        }
+        return commissionRate;
+    }
+
     private void notifyShopOwner(Long shopId, String type, String title, String message, String dedupeKey) {
         try {
             Long ownerId = jdbcTemplate.queryForObject("SELECT `owner_id` FROM `Shops` WHERE `id` = ?", Long.class, shopId);
@@ -2393,6 +2436,9 @@ public class MarketplaceService {
     }
 
     public record ReviewRequest(Integer rating, String comment) {
+    }
+
+    public record ReviewEligibilityResponse(boolean eligible, boolean purchased, boolean reviewed, String reason) {
     }
 
     public record ShopProfile(

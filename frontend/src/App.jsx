@@ -24,6 +24,10 @@ import MarketplaceModulesPage from "./pages/MarketplaceModulesPage";
 import RegisterPage from "./pages/RegisterPage";
 import VerifyOtpPage from "./pages/VerifyOtpPage";
 import WishlistPage from "./pages/WishlistPage";
+import ForgotPasswordPage from "./pages/ForgotPasswordPage";
+import CustomRequestsPage from "./pages/CustomRequestsPage";
+import SellerTransactionsPage from "./pages/SellerTransactionsPage";
+import SellerShopProfilePage from "./pages/SellerShopProfilePage";
 
 export default function App() {
   return (
@@ -31,6 +35,7 @@ export default function App() {
       <Route path="/login" element={<LoginPage />} />
       <Route path="/register" element={<RegisterPage />} />
       <Route path="/verify-otp" element={<VerifyOtpPage />} />
+      <Route path="/forgot-password" element={<ForgotPasswordPage />} />
       <Route element={<Layout />}>
         <Route index element={<ProductsPage />} />
         <Route path="/products/:productId" element={<ProductDetailPage />} />
@@ -38,6 +43,8 @@ export default function App() {
         <Route path="/profile" element={<ProfilePage />} />
         <Route path="/wishlist" element={<WishlistPage />} />
         <Route path="/chat" element={<ChatPage />} />
+        <Route path="/custom-requests" element={<CustomRequestsPage />} />
+        <Route path="/custom-orders" element={<CustomOrdersPage />} />
         <Route path="/notifications" element={<NotificationsPage />} />
         <Route path="/modules" element={<MarketplaceModulesPage />} />
         <Route path="/cart" element={<CartPage />} />
@@ -46,10 +53,12 @@ export default function App() {
         <Route path="/orders" element={<OrdersPage />} />
         <Route path="/orders/:orderId" element={<OrderDetailPage />} />
         <Route path="/seller" element={<SellerDashboardPage />} />
+        <Route path="/seller/profile" element={<SellerShopProfilePage />} />
         <Route path="/seller/products" element={<CatalogManagementPage />} />
         <Route path="/seller/custom-orders" element={<CustomOrdersPage />} />
         <Route path="/seller/media" element={<MediaLibraryPage />} />
         <Route path="/seller/orders" element={<SellerOrdersPage />} />
+        <Route path="/seller/transactions" element={<SellerTransactionsPage />} />
         <Route path="/admin" element={<AdminDashboardPage />} />
         <Route path="/admin/manage" element={<AdminManagementPage />} />
         <Route path="/admin/catalog" element={<CatalogManagementPage />} />

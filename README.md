@@ -1,115 +1,128 @@
 # TMDT Handmade Marketplace
 
-Spring Boot + React/Vite marketplace demo cho san pham handmade. Project co buyer, seller, admin, gio hang theo user, checkout nhieu shop, tinh phi GHN, thanh toan VNPay, quan ly order theo tung shop package.
+Marketplace sản phẩm handmade xây dựng bằng Spring Boot và React/Vite. Hệ thống hỗ trợ khách hàng, người bán, quản trị viên, giỏ hàng đa shop, đơn custom, vận chuyển GHN và thanh toán COD/VNPay.
 
-## Tech Stack
+## Chức năng chính
 
-- Backend: Spring Boot 3.3, Java 17, JDBC, MySQL, Redis cache
-- Frontend: React 18, Vite, React Query, Axios
-- Database: MySQL database `e_commerce`
-- Shipping: GHN API cho tinh/thanh, quan/huyen, phuong/xa va phi van chuyen
-- Payment: VNPay sandbox hoac mock local
+### Khách hàng
 
-## Requirements
+- Đăng ký, xác thực OTP, đăng nhập, đăng xuất và đặt lại mật khẩu.
+- Tìm kiếm, lọc giá, sắp xếp và xem chi tiết sản phẩm/shop.
+- Quản lý giỏ hàng đa shop, voucher, điểm thưởng và checkout.
+- Thanh toán COD hoặc VNPay, theo dõi và hủy đơn hợp lệ.
+- Đánh giá sản phẩm sau khi đơn hoàn tất; mỗi sản phẩm chỉ được đánh giá một lần.
+- Đăng yêu cầu sản phẩm custom, xem proposal/bản thảo và chấp nhận báo giá.
+- Theo dõi đơn custom và gửi yêu cầu chỉnh sửa.
+- Gửi yêu cầu hoàn trả/hoàn tiền.
 
-- Java 17+
-- Node.js 18+
-- MySQL 8+ hoac XAMPP MySQL
-- Redis 6+ khuyen nghi, app van co memory fallback cho cart neu Redis khong san sang
-- Git
+### Người bán
 
-Kiem tra nhanh:
+- Đăng ký seller và chờ quản trị viên phê duyệt.
+- Chỉnh sửa hồ sơ gian hàng: tên, logo, ảnh bìa, mô tả, vật liệu và kinh nghiệm.
+- Tạo/sửa sản phẩm, cập nhật tồn kho và ngưỡng cảnh báo.
+- Nhận thông báo yêu cầu custom, gửi báo giá và bản thảo.
+- Xử lý revision, đơn thường, vận đơn và hoàn trả.
+- Xem giao dịch, doanh thu, phí nền tảng và thực nhận.
 
-```bash
+### Quản trị viên
+
+- Phê duyệt seller và sản phẩm.
+- Quản lý đơn hàng, báo cáo vi phạm và đánh giá.
+- Cấu hình phí nền tảng; phí mới được áp dụng cho các checkout tiếp theo.
+- Theo dõi dashboard và độ tin cậy thanh toán.
+
+## Công nghệ
+
+- Backend: Java 17+, Spring Boot 3.3, JDBC, MySQL, Redis.
+- Frontend: React 18, Vite, React Query, Axios.
+- Vận chuyển: GHN API.
+- Thanh toán: VNPay sandbox hoặc mock local.
+
+## Yêu cầu môi trường
+
+- Java 17 trở lên.
+- Node.js 18 trở lên và npm.
+- MySQL 8 trở lên hoặc MySQL trong XAMPP.
+- Redis 6 trở lên là tùy chọn; giỏ hàng có memory fallback khi Redis không hoạt động.
+- Git.
+
+Kiểm tra phiên bản:
+
+```powershell
 java -version
 node -v
 npm -v
+git --version
 ```
 
-Windows co the dung Maven wrapper:
+## Cấu hình backend
 
-```powershell
-cd backend
-.\mvnw.cmd -version
-```
-
-macOS/Linux:
-
-```bash
-cd backend
-./mvnw -version
-```
-
-## Setup Local
-
-1. Clone repo va vao thu muc project:
-
-```bash
-git clone <repo-url>
-cd TMDT
-```
-
-2. Tao file cau hinh local cho backend:
-
-```bash
-cd backend
-cp .env.example .env
-```
-
-Tren PowerShell:
+Tạo file cấu hình local từ file mẫu:
 
 ```powershell
 cd backend
 Copy-Item .env.example .env
 ```
 
-3. Sua `backend/.env` theo may local:
+macOS/Linux:
+
+```bash
+cd backend
+cp .env.example .env
+```
+
+Cấu hình MySQL tối thiểu trong `backend/.env`:
 
 ```properties
 MYSQL_URL=jdbc:mysql://localhost:3306/e_commerce?createDatabaseIfNotExist=true&useUnicode=true&characterEncoding=utf8&serverTimezone=Asia/Ho_Chi_Minh&useSSL=false&allowPublicKeyRetrieval=true
 MYSQL_USER=root
 MYSQL_PASSWORD=
+
 REDIS_HOST=localhost
 REDIS_PORT=6379
 ```
 
-Neu dung XAMPP, bat MySQL trong XAMPP Control Panel. User mac dinh thuong la `root`, password de trong.
+Nếu dùng XAMPP, bật MySQL trước khi chạy backend. Tài khoản mặc định thường là `root` và mật khẩu trống.
 
-4. Cau hinh GHN:
+### GHN
+
+Điền thông tin sau để tải tỉnh/huyện/xã và tính phí vận chuyển thật:
 
 ```properties
-GHN_TOKEN=...
-GHN_SHOP_ID=...
-GHN_BASE_URL=https://online-gateway.ghn.vn/shiip/public-api
+GHN_TOKEN=your_token
+GHN_SHOP_ID=your_shop_id
 GHN_FROM_DISTRICT_ID=1442
 GHN_FROM_WARD_CODE=20101
 ```
 
-GHN dang duoc goi that cho tinh/thanh, quan/huyen, phuong/xa va phi ship. Neu thieu `GHN_TOKEN` hoac `GHN_SHOP_ID`, man checkout/tinh phi ship se tra 503.
+Thiếu token/shop ID có thể khiến các API địa chỉ hoặc phí giao hàng trả lỗi `503`.
 
-5. Cau hinh VNPay:
+### VNPay
+
+Test nhanh bằng mock local:
+
+```properties
+VNPAY_MOCK_ENABLED=true
+VNPAY_RETURN_URL=http://localhost:5173/payment-result
+```
+
+Dùng VNPay sandbox thật:
 
 ```properties
 VNPAY_MOCK_ENABLED=false
-VNPAY_TMN_CODE=...
-VNPAY_HASH_SECRET=...
+VNPAY_TMN_CODE=your_tmn_code
+VNPAY_HASH_SECRET=your_hash_secret
 VNPAY_PAY_URL=https://sandbox.vnpayment.vn/paymentv2/vpcpay.html
 VNPAY_RETURN_URL=http://localhost:5173/payment-result
 ```
 
-Muon test nhanh khong qua VNPay sandbox thi co the dat:
+Không commit `backend/.env`. File này đã nằm trong `.gitignore`; chỉ commit `.env.example`.
 
-```properties
-VNPAY_MOCK_ENABLED=true
-```
+## Chạy dự án
 
-Khong nen bat mock khi demo luong thanh toan that.
+### 1. Chạy backend
 
-## Run Project
-
-Chay backend tu thu muc `backend`.
-
-Windows:
+Mở terminal thứ nhất:
 
 ```powershell
 cd backend
@@ -123,143 +136,54 @@ cd backend
 ./mvnw spring-boot:run
 ```
 
-Backend chay o:
+Backend chạy tại `http://localhost:8080`.
 
-```text
-http://localhost:8080
-```
+Lần khởi động đầu, `DatabaseInitializer` tự tạo/cập nhật schema và seed dữ liệu demo trong database `e_commerce`.
 
-Chay frontend tu thu muc `frontend`:
+### 2. Chạy frontend
 
-```bash
+Mở terminal thứ hai:
+
+```powershell
 cd frontend
 npm install
 npm run dev
 ```
 
-Frontend chay o:
+Frontend chạy tại `http://localhost:5173`. Vite proxy các request `/api` sang `http://localhost:8080`.
 
-```text
-http://localhost:5173
+## Tài khoản demo
+
+| Vai trò | Tên đăng nhập | Mật khẩu |
+| --- | --- | --- |
+| Khách hàng | `buyer` | `buyer` |
+| Người bán shop đầu tiên | `seller` | `seller` |
+| Người bán khác | `seller2` đến `seller8` | `seller` |
+| Quản trị viên | `admin` | `admin` |
+
+OTP demo cho đăng ký/xác thực là `123456`.
+
+## Kiểm tra tự động và build
+
+### Backend
+
+Windows:
+
+```powershell
+cd backend
+.\mvnw.cmd test
 ```
 
-Vite da proxy `/api` sang backend `http://localhost:8080`, nen nen mo web bang `localhost:5173`.
-
-## Database
-
-Khi backend start, `DatabaseInitializer` tu tao/cap nhat schema can thiet neu thieu:
-
-- `Users`, `Accounts`, `Shops`, `Categories`, `Products`, `ProductImages`, `Storage`
-- `Orders`, `shop_orders`, `OrderItems`
-- `payment_transactions`, `Payments`
-- `shipments`, `shop_shipping_profiles`
-
-App cung seed data demo gom buyer, seller, admin, shop va san pham.
-
-Neu can reset data local:
-
-```sql
-DROP DATABASE e_commerce;
-CREATE DATABASE e_commerce CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
-```
-
-Sau do start backend lai.
-
-## Test Accounts
-
-| Role | Username | Password | Ghi chu |
-| --- | --- | --- | --- |
-| Buyer | `buyer` | `buyer` | Mua hang, checkout, xem/huy don |
-| Seller | `seller` | `seller` | Quan ly shop orders cua shop minh |
-| Admin | `admin` | `admin` | Xem va quan ly tat ca orders |
-
-Trang test nhanh:
-
-- Buyer: `http://localhost:5173/products`, `/cart`, `/checkout`, `/orders`
-- Seller: `http://localhost:5173/seller/orders`
-- Admin: `http://localhost:5173/admin/orders`
-
-## Main Flows
-
-Buyer:
-
-1. Login bang `buyer/buyer`.
-2. Vao `/products`, them san pham vao gio.
-3. Vao `/cart`, kiem tra gio hang group theo shop.
-4. Checkout tai `/checkout`, dia chi lay tu GHN, phi ship tinh bang GHN.
-5. Chon COD hoac VNPay.
-6. Xem lich su don tai `/orders`.
-
-Order nhieu shop:
-
-- Mot checkout co the tao 1 order tong va nhieu `shop_orders`.
-- Huy toan bo don chi nen dung khi muon huy ca order tong.
-- Neu don co nhieu shop, vao chi tiet order de huy tung goi shop bang nut `Huy goi nay`.
-- Package da `PACKING`, `SHIPPING`, `COMPLETED` khong cho buyer tu huy.
-
-Seller:
-
-1. Login bang `seller/seller`.
-2. Vao `/seller/orders`.
-3. Chuyen trang thai theo flow: `NEW -> CONFIRMED -> PACKING -> SHIPPING -> COMPLETED`.
-4. Seller chi thay shop do tai khoan minh quan ly.
-
-Admin:
-
-1. Login bang `admin/admin`.
-2. Vao `/admin/orders`.
-3. Xem order tong, shop order, payment, shipment.
-
-## Important API
-
-Auth:
-
-- `POST /api/v1/auth/login`
-- `POST /api/v1/auth/register`
-
-Products/cart:
-
-- `GET /api/v1/products`
-- `GET /api/v1/cart`
-- `POST /api/v1/cart/items`
-- `PUT /api/v1/cart/items/{itemKey}`
-- `DELETE /api/v1/cart/items/{itemKey}`
-- `DELETE /api/v1/cart`
-
-Checkout/payment/shipping:
-
-- `GET /api/v1/checkout/summary`
-- `POST /api/v1/orders/checkout`
-- `POST /api/v1/payments/vnpay/create`
-- `GET /api/v1/payments/vnpay-return`
-- `GET /api/v1/shipping/provinces`
-- `GET /api/v1/shipping/districts?provinceId=...`
-- `GET /api/v1/shipping/wards?districtId=...`
-- `POST /api/v1/shipping/fee`
-
-Orders:
-
-- `GET /api/v1/orders`
-- `GET /api/v1/orders/{orderId}`
-- `PUT /api/v1/orders/{orderId}/cancel`
-- `PUT /api/v1/orders/{orderId}/shop-orders/{shopOrderId}/cancel`
-- `GET /api/v1/seller/orders`
-- `PUT /api/v1/seller/orders/{shopOrderId}/status`
-- `POST /api/v1/seller/orders/{shopOrderId}/shipments/ghn`
-- `GET /api/v1/admin/orders`
-- `PUT /api/v1/admin/orders/{orderId}/cancel`
-
-## Build
-
-Backend:
+macOS/Linux:
 
 ```bash
 cd backend
-./mvnw clean package
-java -jar target/TMDT_CK-0.0.1-SNAPSHOT.jar
+./mvnw test
 ```
 
-Windows:
+Hiện repository chưa có test class trong `src/test`, nên lệnh trên xác nhận backend compile thành công và sẽ tự chạy test khi test được bổ sung.
+
+Đóng gói file JAR:
 
 ```powershell
 cd backend
@@ -267,33 +191,99 @@ cd backend
 java -jar target\TMDT_CK-0.0.1-SNAPSHOT.jar
 ```
 
-Frontend:
+### Frontend
 
-```bash
+```powershell
 cd frontend
 npm run build
 npm run preview
 ```
 
-## Before Pushing To GitHub
+`npm run build` kiểm tra JSX/import và tạo bản production trong `frontend/dist`.
 
-Khong commit `backend/.env` vi co token GHN/VNPay/MySQL. Repo da ignore `backend/.env`, chi commit `backend/.env.example`.
+## Checklist kiểm thử thủ công
 
-Nen chay truoc:
+### Luồng khách hàng
 
-```bash
-git status --short
-cd backend
-./mvnw -q -DskipTests compile
-cd ../frontend && npm run build
+1. Đăng nhập `buyer/buyer` tại `/login`.
+2. Tìm kiếm/lọc sản phẩm tại `/`, mở chi tiết và thêm vào giỏ.
+3. Cập nhật số lượng hoặc xóa sản phẩm tại `/cart`.
+4. Checkout tại `/checkout`, chọn COD hoặc VNPay mock.
+5. Xem danh sách/chi tiết đơn tại `/orders`.
+6. Chỉ đánh giá sản phẩm sau khi kiện hàng chuyển `COMPLETED`; thử gửi lần hai để kiểm tra chống trùng.
+7. Vào `/custom-requests`, đăng yêu cầu custom và chờ seller gửi proposal.
+8. Chấp nhận proposal, mở `/custom-orders` và gửi revision khi đơn đang chế tác.
+9. Kiểm tra `/notifications` có thông báo báo giá/revision.
+10. Test quên mật khẩu tại `/forgot-password` bằng OTP demo.
+
+### Luồng người bán
+
+1. Đăng nhập `seller/seller`, mở `/seller`.
+2. Chỉnh hồ sơ tại `/seller/profile`, sau đó mở trang shop công khai để kiểm tra.
+3. Tạo/sửa listing và cập nhật nhanh tồn kho tại `/seller/products`.
+4. Mở `/custom-requests`, chọn yêu cầu và gửi giá, thời gian, URL bản thảo.
+5. Xử lý đơn và revision tại `/seller/custom-orders` hoặc `/custom-orders`.
+6. Xử lý đơn thường tại `/seller/orders` theo luồng `NEW -> CONFIRMED -> PACKING -> SHIPPING -> COMPLETED`.
+7. Kiểm tra doanh thu/phí sàn tại `/seller/transactions`.
+
+### Luồng quản trị viên
+
+1. Đăng nhập `admin/admin`, mở `/admin`.
+2. Duyệt seller trong `/admin/manage`.
+3. Duyệt sản phẩm trong `/admin/catalog`.
+4. Cập nhật phí nền tảng trong `/admin/manage`.
+5. Tạo checkout mới bằng buyer và xác nhận `commissionAmount`/`payoutAmount` thay đổi theo mức phí mới.
+6. Kiểm tra đơn toàn hệ thống tại `/admin/orders`.
+
+## Route giao diện quan trọng
+
+| Route | Chức năng |
+| --- | --- |
+| `/` | Danh sách, tìm kiếm, lọc sản phẩm |
+| `/cart`, `/checkout` | Giỏ hàng và đặt hàng |
+| `/orders` | Đơn mua |
+| `/custom-requests` | Yêu cầu custom, proposal và bản thảo |
+| `/custom-orders` | Theo dõi đơn custom/revision |
+| `/seller/profile` | Hồ sơ gian hàng |
+| `/seller/products` | Listing và tồn kho |
+| `/seller/orders` | Đơn hàng của shop |
+| `/seller/transactions` | Giao dịch, phí sàn, thực nhận |
+| `/admin/manage` | Người dùng, báo cáo, phí nền tảng |
+
+## Xử lý lỗi thường gặp
+
+### Backend không kết nối MySQL
+
+Lỗi thường gặp: `Communications link failure` hoặc `Connection refused`.
+
+- Kiểm tra MySQL/XAMPP đã bật.
+- Kiểm tra port MySQL, thường là `3306`.
+- Kiểm tra `MYSQL_USER`, `MYSQL_PASSWORD` trong `backend/.env`.
+- Kiểm tra không có service khác chiếm port.
+
+Reset database local khi cần dữ liệu sạch:
+
+```sql
+DROP DATABASE IF EXISTS e_commerce;
+CREATE DATABASE e_commerce CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
 ```
 
-Windows:
+Sau đó chạy lại backend để tự tạo schema và seed dữ liệu.
+
+### Frontend không gọi được API
+
+- Đảm bảo backend đang chạy port `8080`.
+- Mở frontend bằng `http://localhost:5173`, không mở trực tiếp file HTML.
+- Kiểm tra terminal backend để xem lỗi database hoặc GHN.
+
+## Trước khi push Git
 
 ```powershell
 git status --short
 cd backend
-.\mvnw.cmd -q -DskipTests compile
+.\mvnw.cmd test
 cd ..\frontend
 npm run build
 ```
+
+Chỉ push khi cả backend và frontend build thành công.

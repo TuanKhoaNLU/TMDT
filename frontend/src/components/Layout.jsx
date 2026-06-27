@@ -13,6 +13,7 @@ import {
   ShieldCheck,
   ShoppingCart,
   MessageSquare,
+  Sparkles,
   Store,
   UserRound
 } from "lucide-react";
@@ -78,6 +79,9 @@ export function Layout() {
                 <NavLink to="/chat">
                   <MessageSquare size={17} /> Chat
                 </NavLink>
+                <NavLink to="/custom-requests">
+                  <Sparkles size={17} /> Custom
+                </NavLink>
                 <NavLink to="/orders">
                   <ReceiptText size={17} /> Đơn mua
                 </NavLink>
@@ -120,6 +124,7 @@ export function Layout() {
             <a href="/cart">Giỏ hàng đa shop</a>
             <a href="/orders">Theo dõi đơn</a>
             <a href="/chat">Chat/quote</a>
+            <a href="/custom-requests">Yêu cầu custom</a>
             <a href="/admin/manage">Quản trị</a>
             <a href="/modules">Tất cả module</a>
           </div>

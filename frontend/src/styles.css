@@ -1913,6 +1913,221 @@ select:focus {
   color: var(--primary);
 }
 
+.commission-layout {
+  display: grid;
+  grid-template-columns: minmax(240px, 320px) minmax(0, 1fr);
+  gap: 16px;
+  align-items: start;
+}
+
+.commission-list,
+.commission-detail,
+.custom-order-panel {
+  display: grid;
+  gap: 16px;
+}
+
+.commission-list button {
+  width: 100%;
+  border: 1px solid var(--line);
+  text-align: left;
+}
+
+.request-meta {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  flex-wrap: wrap;
+  padding-block: 12px;
+  border-block: 1px solid var(--line);
+}
+
+.request-meta span,
+.request-meta a {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.proposal-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 120px auto;
+  gap: 14px;
+  align-items: center;
+  border-top: 1px solid var(--line);
+  padding-top: 14px;
+}
+
+.proposal-row img {
+  width: 120px;
+  aspect-ratio: 4 / 3;
+  border-radius: var(--radius-sm);
+  object-fit: cover;
+}
+
+.quote-form textarea,
+.revision-form input {
+  min-width: 0;
+}
+
+.revision-list {
+  display: grid;
+  gap: 10px;
+  border-top: 1px solid var(--line);
+  padding-top: 14px;
+}
+
+.transaction-table {
+  display: grid;
+  overflow-x: auto;
+}
+
+.transaction-row {
+  min-width: 880px;
+  display: grid;
+  grid-template-columns: 120px 150px repeat(3, minmax(130px, 1fr)) 150px;
+  gap: 12px;
+  align-items: center;
+  border-top: 1px solid var(--line);
+  padding: 12px 4px;
+}
+
+.transaction-row > span {
+  display: grid;
+  gap: 5px;
+}
+
+.transaction-head {
+  border-top: 0;
+  color: var(--muted);
+  font-size: 13px;
+  font-weight: 800;
+}
+
+.platform-fee-panel,
+.settings-form {
+  display: grid;
+  gap: 16px;
+}
+
+.settings-form {
+  grid-template-columns: repeat(3, minmax(0, 1fr)) auto;
+  align-items: end;
+}
+
+.settings-form label {
+  display: grid;
+  gap: 7px;
+  color: var(--muted);
+  font-size: 13px;
+  font-weight: 800;
+}
+
+.settings-form input {
+  width: 100%;
+}
+
+.fee-preview {
+  color: var(--primary);
+  font-size: 24px;
+}
+
+.inventory-actions {
+  display: grid;
+  grid-template-columns: 70px 82px auto;
+  gap: 7px;
+  align-items: end;
+}
+
+.inventory-actions label {
+  display: grid;
+  gap: 4px;
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 800;
+}
+
+.inventory-actions input {
+  width: 100%;
+  min-width: 0;
+}
+
+.inventory-actions .btn:last-child {
+  grid-column: 1 / -1;
+}
+
+.shop-profile-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1.2fr) minmax(300px, 0.8fr);
+  gap: 16px;
+  align-items: start;
+}
+
+.shop-profile-form,
+.shop-profile-preview {
+  display: grid;
+  gap: 14px;
+}
+
+.shop-profile-form label {
+  display: grid;
+  gap: 7px;
+  color: var(--muted);
+  font-size: 13px;
+  font-weight: 800;
+}
+
+.shop-profile-form input,
+.shop-profile-form textarea {
+  width: 100%;
+}
+
+.shop-preview-hero {
+  min-height: 210px;
+  aspect-ratio: 16 / 7;
+  display: flex;
+  align-items: flex-end;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  background-color: var(--surface-soft);
+  background-position: center;
+  background-size: cover;
+  padding: 14px;
+}
+
+.shop-preview-hero img {
+  width: 72px;
+  height: 72px;
+  border: 3px solid white;
+  border-radius: var(--radius-sm);
+  background: white;
+  object-fit: cover;
+}
+
+.shop-preview-meta {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.shop-preview-meta span {
+  display: grid;
+  gap: 4px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  padding: 10px;
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.verified-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--success);
+  font-weight: 800;
+}
+
 @media (max-width: 1100px) {
   .topbar {
     grid-template-columns: 1fr;
@@ -1934,6 +2149,21 @@ select:focus {
   .product-detail-shell,
   .content-grid {
     grid-template-columns: 1fr;
+  }
+
+  .commission-layout,
+  .settings-form,
+  .shop-profile-layout {
+    grid-template-columns: 1fr;
+  }
+
+  .proposal-row {
+    grid-template-columns: minmax(0, 1fr) 100px;
+  }
+
+  .proposal-row .btn {
+    grid-column: 1 / -1;
+    justify-self: start;
   }
 
   .market-order,

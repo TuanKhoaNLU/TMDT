@@ -14,6 +14,7 @@ import java.sql.Timestamp;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 @Service
 public class MarketplaceModuleService {
@@ -78,6 +79,7 @@ public class MarketplaceModuleService {
                        COALESCE(p.`status`, 'hidden') AS sale_status,
                        COALESCE(p.`main_image_url`, pi.`url`, '') AS image_url,
                        COALESCE(p.`options_json`, '') AS options_json,
+                       COALESCE(p.`is_custom`, false) AS is_custom,
                        COALESCE(p.`requires_personalization`, false) AS requires_personalization,
                        COALESCE(p.`processing_days`, 3) AS processing_days,
                        COALESCE(st.`quantity`, 0) AS stock,
@@ -91,6 +93,41 @@ public class MarketplaceModuleService {
                 """, this::mapProductAdmin, shopId);
     }
 
+    public SellerShopProfileSummary getSellerShopProfile(Long shopId) {
+        return jdbcTemplate.queryForObject("""
+                SELECT `id`, `shop_name`, COALESCE(`logo_url`, '') AS logo_url,
+                       COALESCE(`hero_url`, '') AS hero_url, COALESCE(`description`, '') AS description,
+                       COALESCE(`about`, '') AS about, COALESCE(`materials`, '') AS materials,
+                       COALESCE(`years_experience`, 1) AS years_experience,
+                       COALESCE(`verified_artisan`, false) AS verified_artisan,
+                       COALESCE(`status`, 'ACTIVE') AS status
+                FROM `Shops`
+                WHERE `id` = ?
+                """, this::mapSellerShopProfile, shopId);
+    }
+
+    public SellerShopProfileSummary updateSellerShopProfile(Long shopId, SellerShopProfileRequest request) {
+        requireText(request.shopName(), "Vui lòng nhập tên shop.");
+        if (request.shopName().trim().length() > 120) {
+            throw badRequest("Tên shop không được vượt quá 120 ký tự.");
+        }
+        int yearsExperience = request.yearsExperience() == null ? 1 : request.yearsExperience();
+        if (yearsExperience < 0 || yearsExperience > 100) {
+            throw badRequest("Số năm kinh nghiệm phải nằm trong khoảng 0 đến 100.");
+        }
+        int updated = jdbcTemplate.update("""
+                UPDATE `Shops`
+                SET `shop_name` = ?, `logo_url` = ?, `hero_url` = ?, `description` = ?,
+                    `about` = ?, `materials` = ?, `years_experience` = ?
+                WHERE `id` = ?
+                """, request.shopName().trim(), request.logoUrl(), request.heroUrl(), request.description(),
+                request.about(), request.materials(), yearsExperience, shopId);
+        if (updated == 0) {
+            throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Không tìm thấy shop.");
+        }
+        return getSellerShopProfile(shopId);
+    }
+
     public List<ProductAdminSummary> listAdminProducts() {
         return jdbcTemplate.query("""
                 SELECT p.`id`, p.`shop_id`, p.`cat_id`, p.`name`, COALESCE(p.`sku`, '') AS sku,
@@ -100,6 +137,7 @@ public class MarketplaceModuleService {
                        COALESCE(p.`status`, 'hidden') AS sale_status,
                        COALESCE(p.`main_image_url`, pi.`url`, '') AS image_url,
                        COALESCE(p.`options_json`, '') AS options_json,
+                       COALESCE(p.`is_custom`, false) AS is_custom,
                        COALESCE(p.`requires_personalization`, false) AS requires_personalization,
                        COALESCE(p.`processing_days`, 3) AS processing_days,
                        COALESCE(st.`quantity`, 0) AS stock,
@@ -152,6 +190,45 @@ public class MarketplaceModuleService {
                     request.stock(), request.lowStockAlert() == null ? 5 : request.lowStockAlert(), productId);
             logInventory(productId, request.stock() - (oldStock == null ? 0 : oldStock), "SELLER_UPDATE", "Seller cap nhat ton kho");
         }
+        return listSellerProducts(shopId).stream().filter(product -> product.id().equals(productId)).findFirst().orElseThrow();
+    }
+
+    @Transactional
+    public ProductAdminSummary updateSellerInventory(Long shopId, Long productId, InventoryUpdateRequest request) {
+        int stock = request.stock() == null ? 0 : request.stock();
+        int lowStockAlert = request.lowStockAlert() == null ? 0 : request.lowStockAlert();
+        if (stock < 0 || lowStockAlert < 0) {
+            throw badRequest("Tồn kho và ngưỡng cảnh báo không được âm.");
+        }
+        if (count("SELECT COUNT(*) FROM `Products` WHERE `id` = ? AND `shop_id` = ?", productId, shopId) == 0) {
+            throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Không tìm thấy sản phẩm của shop.");
+        }
+        Integer oldStock = jdbcTemplate.query("SELECT `quantity` FROM `Storage` WHERE `product_id` = ? LIMIT 1",
+                rs -> rs.next() ? rs.getInt("quantity") : null, productId);
+        if (oldStock == null) {
+            jdbcTemplate.update("""
+                    INSERT INTO `Storage` (`id`, `product_id`, `warehouse_id`, `quantity`, `reserved_quantity`, `low_stock_alert`, `last_updated`)
+                    VALUES (?, ?, 1, ?, 0, ?, CURRENT_TIMESTAMP)
+                    """, nextId("Storage"), productId, stock, lowStockAlert);
+        } else {
+            jdbcTemplate.update("""
+                    UPDATE `Storage`
+                    SET `quantity` = ?, `low_stock_alert` = ?, `last_updated` = CURRENT_TIMESTAMP
+                    WHERE `product_id` = ?
+                    """, stock, lowStockAlert, productId);
+        }
+        jdbcTemplate.update("""
+                UPDATE `Products`
+                SET `status` = CASE
+                    WHEN COALESCE(`approval_status`, 'APPROVED') <> 'APPROVED' THEN `status`
+                    WHEN ? = 0 THEN 'out_of_stock'
+                    WHEN ? <= ? THEN 'low_stock'
+                    ELSE 'active'
+                END
+                WHERE `id` = ? AND `shop_id` = ?
+                """, stock, stock, lowStockAlert, productId, shopId);
+        logInventory(productId, stock - (oldStock == null ? 0 : oldStock), "SELLER_INVENTORY",
+                "Seller cập nhật tồn kho và ngưỡng cảnh báo");
         return listSellerProducts(shopId).stream().filter(product -> product.id().equals(productId)).findFirst().orElseThrow();
     }
 
@@ -502,6 +579,8 @@ public class MarketplaceModuleService {
                 """, messageId, conversationId, sellerId, body, customOrderId);
         jdbcTemplate.update("UPDATE `chat_conversations` SET `last_message` = ?, `customer_unread` = COALESCE(`customer_unread`, 0) + 1, `updated_at` = CURRENT_TIMESTAMP WHERE `id` = ?",
                 body, conversationId);
+        notifyUser(customerId, "CUSTOM_QUOTE", "Bạn có báo giá custom mới", body,
+                "custom-quote-" + customOrderId);
         return listMessages(conversationId, sellerId, "SELLER", shopId).stream().filter(message -> message.id().equals(messageId)).findFirst().orElseThrow();
     }
 
@@ -555,6 +634,7 @@ public class MarketplaceModuleService {
 
     public CustomOrderSummary updateCustomOrderStatus(Long customOrderId, StatusRequest request, Long userId, String role, Long shopId) {
         requireText(request.status(), "Thieu status.");
+        String nextStatus = request.status().trim().toUpperCase();
         Map<String, Object> order = jdbcTemplate.queryForMap("""
                 SELECT `customer_id`, `shop_id`
                 FROM `custom_orders`
@@ -568,17 +648,106 @@ public class MarketplaceModuleService {
             if (shopId == null || !shopId.equals(orderShopId) || !shopOwnedByUser(userId, shopId)) {
                 throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Tai khoan khong quan ly don nay");
             }
+            if (!Set.of("CRAFTING", "FINISHING", "SHIPPED", "DELIVERED", "CANCELLED").contains(nextStatus)) {
+                throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Người bán không được chuyển sang trạng thái này");
+            }
         } else if (!customerId.equals(userId)) {
             throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Tai khoan khong quan ly don nay");
+        } else if (!Set.of("AWAITING_PAYMENT", "CANCELLED").contains(nextStatus)) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Khách hàng chỉ có thể chấp nhận báo giá hoặc hủy yêu cầu");
         }
         jdbcTemplate.update("UPDATE `custom_orders` SET `status` = ?, `updated_at` = CURRENT_TIMESTAMP WHERE `id` = ?",
-                request.status(), customOrderId);
+                nextStatus, customOrderId);
         return jdbcTemplate.queryForObject("""
                 SELECT `id`, `customer_id`, `shop_id`, `conversation_id`, `title`, `description`, `price`,
                        `status`, `payment_status`, `due_date`, `created_at`, `updated_at`
                 FROM `custom_orders`
                 WHERE `id` = ?
                 """, this::mapCustomOrder, customOrderId);
+    }
+
+    @Transactional
+    public CustomOrderRevisionSummary createCustomOrderRevision(Long customOrderId, Long customerId,
+                                                                 CustomOrderRevisionRequest request) {
+        requireText(request.reason(), "Vui lòng nhập nội dung cần chỉnh sửa.");
+        Map<String, Object> order = jdbcTemplate.queryForMap("""
+                SELECT `customer_id`, `shop_id`, `status`, `title`
+                FROM `custom_orders`
+                WHERE `id` = ?
+                """, customOrderId);
+        if (((Number) order.get("customer_id")).longValue() != customerId) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Bạn không quản lý đơn custom này.");
+        }
+        String orderStatus = String.valueOf(order.get("status")).toUpperCase();
+        if (!Set.of("CRAFTING", "FINISHING", "REVISION_REJECTED").contains(orderStatus)) {
+            throw badRequest("Chỉ có thể yêu cầu chỉnh sửa khi sản phẩm đang được chế tác hoặc hoàn thiện.");
+        }
+        if (count("SELECT COUNT(*) FROM `custom_order_revisions` WHERE `custom_order_id` = ? AND `status` = 'REQUESTED'", customOrderId) > 0) {
+            throw badRequest("Đơn custom đang có một yêu cầu chỉnh sửa chờ xử lý.");
+        }
+        long revisionId = nextId("custom_order_revisions");
+        jdbcTemplate.update("""
+                INSERT INTO `custom_order_revisions` (`id`, `custom_order_id`, `customer_id`, `reason`, `status`)
+                VALUES (?, ?, ?, ?, 'REQUESTED')
+                """, revisionId, customOrderId, customerId, request.reason());
+        jdbcTemplate.update("UPDATE `custom_orders` SET `status` = 'REVISION_REQUESTED', `updated_at` = CURRENT_TIMESTAMP WHERE `id` = ?",
+                customOrderId);
+        Long shopId = ((Number) order.get("shop_id")).longValue();
+        notifyShopOwner(shopId, "CUSTOM_REVISION", "Khách yêu cầu chỉnh sửa",
+                "Đơn custom " + order.get("title") + " có yêu cầu chỉnh sửa mới.", "custom-revision-" + revisionId);
+        return getCustomOrderRevision(revisionId);
+    }
+
+    public List<CustomOrderRevisionSummary> listCustomOrderRevisions(Long userId, String role, Long shopId) {
+        String select = """
+                SELECT r.`id`, r.`custom_order_id`, r.`customer_id`, r.`reason`, r.`status`, r.`seller_response`,
+                       r.`created_at`, r.`updated_at`
+                FROM `custom_order_revisions` r
+                JOIN `custom_orders` co ON co.`id` = r.`custom_order_id`
+                """;
+        if ("ADMIN".equalsIgnoreCase(role)) {
+            return jdbcTemplate.query(select + " ORDER BY r.`created_at` DESC", this::mapCustomOrderRevision);
+        }
+        if ("SELLER".equalsIgnoreCase(role)) {
+            return jdbcTemplate.query(select + " WHERE co.`shop_id` = ? ORDER BY r.`created_at` DESC",
+                    this::mapCustomOrderRevision, shopId);
+        }
+        return jdbcTemplate.query(select + " WHERE co.`customer_id` = ? ORDER BY r.`created_at` DESC",
+                this::mapCustomOrderRevision, userId);
+    }
+
+    @Transactional
+    public CustomOrderRevisionSummary resolveCustomOrderRevision(Long revisionId, Long sellerId, Long shopId,
+                                                                  CustomOrderRevisionResolveRequest request) {
+        String status = request.status() == null ? "" : request.status().trim().toUpperCase();
+        if (!Set.of("ACCEPTED", "REJECTED").contains(status)) {
+            throw badRequest("Trạng thái xử lý chỉnh sửa không hợp lệ.");
+        }
+        Map<String, Object> revision = jdbcTemplate.queryForMap("""
+                SELECT r.`custom_order_id`, r.`customer_id`, r.`status`, co.`shop_id`, co.`title`
+                FROM `custom_order_revisions` r
+                JOIN `custom_orders` co ON co.`id` = r.`custom_order_id`
+                WHERE r.`id` = ?
+                """, revisionId);
+        if (!shopId.equals(((Number) revision.get("shop_id")).longValue()) || !shopOwnedByUser(sellerId, shopId)) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Bạn không quản lý yêu cầu chỉnh sửa này.");
+        }
+        if (!"REQUESTED".equalsIgnoreCase(String.valueOf(revision.get("status")))) {
+            throw badRequest("Yêu cầu chỉnh sửa đã được xử lý.");
+        }
+        jdbcTemplate.update("""
+                UPDATE `custom_order_revisions`
+                SET `status` = ?, `seller_response` = ?, `updated_at` = CURRENT_TIMESTAMP
+                WHERE `id` = ?
+                """, status, request.sellerResponse(), revisionId);
+        Long customOrderId = ((Number) revision.get("custom_order_id")).longValue();
+        jdbcTemplate.update("UPDATE `custom_orders` SET `status` = ?, `updated_at` = CURRENT_TIMESTAMP WHERE `id` = ?",
+                "ACCEPTED".equals(status) ? "CRAFTING" : "REVISION_REJECTED", customOrderId);
+        Long customerId = ((Number) revision.get("customer_id")).longValue();
+        notifyUser(customerId, "CUSTOM_REVISION_RESULT", "Yêu cầu chỉnh sửa đã được xử lý",
+                "Shop đã " + ("ACCEPTED".equals(status) ? "chấp nhận" : "từ chối") + " chỉnh sửa đơn " + revision.get("title") + ".",
+                "custom-revision-result-" + revisionId);
+        return getCustomOrderRevision(revisionId);
     }
 
     public List<CommissionPostSummary> listCommissionPosts() {
@@ -591,6 +760,8 @@ public class MarketplaceModuleService {
     }
 
     public CommissionPostSummary createCommissionPost(Long userId, CommissionPostRequest request) {
+        requireText(request.title(), "Vui lòng nhập tiêu đề yêu cầu custom.");
+        requireText(request.description(), "Vui lòng mô tả sản phẩm cần làm.");
         long id = nextId("commission_posts");
         jdbcTemplate.update("""
                 INSERT INTO `commission_posts` (`id`, `customer_id`, `title`, `description`, `budget_min`, `budget_max`,
@@ -598,24 +769,64 @@ public class MarketplaceModuleService {
                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'OPEN')
                 """, id, userId, request.title(), request.description(), value(request.budgetMin()), value(request.budgetMax()),
                 request.desiredTimeline(), request.referenceImages());
+        jdbcTemplate.queryForList("""
+                SELECT DISTINCT s.`owner_id`
+                FROM `Shops` s
+                JOIN `Accounts` a ON a.`user_id` = s.`owner_id`
+                WHERE COALESCE(s.`status`, 'ACTIVE') = 'ACTIVE' AND a.`role` = 'SELLER' AND a.`status` = 1
+                """, Long.class).forEach(sellerId -> notifyUser(sellerId, "CUSTOM_REQUEST",
+                "Có yêu cầu thiết kế custom mới", request.title(), "commission-post-" + id + "-seller-" + sellerId));
         return listCommissionPosts().stream().filter(post -> post.id().equals(id)).findFirst().orElseThrow();
     }
 
     public ProposalSummary createProposal(Long sellerId, Long shopId, Long postId, ProposalRequest request) {
+        Map<String, Object> post = jdbcTemplate.queryForMap(
+                "SELECT `customer_id`, `status`, `title` FROM `commission_posts` WHERE `id` = ?", postId);
+        if (!"OPEN".equalsIgnoreCase(String.valueOf(post.get("status")))) {
+            throw badRequest("Yêu cầu custom không còn nhận báo giá.");
+        }
+        requireText(request.message(), "Vui lòng nhập nội dung báo giá.");
         long id = nextId("commission_proposals");
         jdbcTemplate.update("""
                 INSERT INTO `commission_proposals` (`id`, `post_id`, `seller_id`, `shop_id`, `message`, `proposed_price`, `lead_time_days`, `sketch_image_url`, `status`)
                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'PENDING')
                 """, id, postId, sellerId, shopId, request.message(), value(request.proposedPrice()),
                 request.leadTimeDays() == null ? 7 : request.leadTimeDays(), request.sketchImageUrl());
+        Long customerId = ((Number) post.get("customer_id")).longValue();
+        notifyUser(customerId, "CUSTOM_PROPOSAL", "Bạn có báo giá mới",
+                "Yêu cầu " + post.get("title") + " vừa nhận báo giá từ một shop.",
+                "commission-proposal-" + id);
         return listProposals(postId).stream().filter(proposal -> proposal.id().equals(id)).findFirst().orElseThrow();
     }
 
     @Transactional
     public ProposalSummary acceptProposal(Long userId, Long postId, Long proposalId) {
+        int owned = count("SELECT COUNT(*) FROM `commission_posts` WHERE `id` = ? AND `customer_id` = ? AND `status` = 'OPEN'", postId, userId);
+        if (owned == 0) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Bạn không có quyền chấp nhận báo giá này.");
+        }
+        if (count("SELECT COUNT(*) FROM `commission_proposals` WHERE `id` = ? AND `post_id` = ?", proposalId, postId) == 0) {
+            throw badRequest("Không tìm thấy báo giá.");
+        }
+        Map<String, Object> accepted = jdbcTemplate.queryForMap("""
+                SELECT cp.`customer_id`, cp.`title`, cp.`description`, pr.`shop_id`, pr.`proposed_price`
+                FROM `commission_posts` cp
+                JOIN `commission_proposals` pr ON pr.`post_id` = cp.`id`
+                WHERE cp.`id` = ? AND pr.`id` = ?
+                """, postId, proposalId);
         jdbcTemplate.update("UPDATE `commission_proposals` SET `status` = 'REJECTED' WHERE `post_id` = ?", postId);
         jdbcTemplate.update("UPDATE `commission_proposals` SET `status` = 'ACCEPTED' WHERE `id` = ? AND `post_id` = ?", proposalId, postId);
         jdbcTemplate.update("UPDATE `commission_posts` SET `status` = 'ASSIGNED' WHERE `id` = ? AND `customer_id` = ?", postId, userId);
+        long customOrderId = nextId("custom_orders");
+        jdbcTemplate.update("""
+                INSERT INTO `custom_orders` (`id`, `customer_id`, `shop_id`, `conversation_id`, `title`, `description`,
+                  `price`, `status`, `payment_status`)
+                VALUES (?, ?, ?, NULL, ?, ?, ?, 'AWAITING_PAYMENT', 'UNPAID')
+                """, customOrderId, accepted.get("customer_id"), accepted.get("shop_id"), accepted.get("title"),
+                accepted.get("description"), accepted.get("proposed_price"));
+        notifyShopOwner(((Number) accepted.get("shop_id")).longValue(), "PROPOSAL_ACCEPTED", "Khách đã chấp nhận báo giá",
+                "Yêu cầu " + accepted.get("title") + " đã chuyển thành đơn custom #" + customOrderId + ".",
+                "proposal-accepted-" + proposalId);
         return listProposals(postId).stream().filter(proposal -> proposal.id().equals(proposalId)).findFirst().orElseThrow();
     }
 
@@ -701,6 +912,16 @@ public class MarketplaceModuleService {
     }
 
     public Map<String, String> updatePlatformSettings(Map<String, String> values) {
+        if (values.containsKey("commission_bps")) {
+            try {
+                int bps = Integer.parseInt(values.get("commission_bps"));
+                if (bps < 0 || bps > 5000) {
+                    throw badRequest("Phí nền tảng phải nằm trong khoảng 0% đến 50%.");
+                }
+            } catch (NumberFormatException ex) {
+                throw badRequest("Phí nền tảng phải là số basis point hợp lệ.");
+            }
+        }
         values.forEach((key, value) -> jdbcTemplate.update("""
                 INSERT INTO `platform_settings` (`setting_key`, `setting_value`) VALUES (?, ?)
                 ON DUPLICATE KEY UPDATE `setting_value` = VALUES(`setting_value`)
@@ -716,6 +937,22 @@ public class MarketplaceModuleService {
                 WHERE o.`buyer_id` = ?
                 ORDER BY p.`id` DESC
                 """, this::mapPaymentHistory, userId);
+    }
+
+    public List<SellerTransactionSummary> sellerTransactions(Long shopId) {
+        return jdbcTemplate.query("""
+                SELECT so.`id` AS shop_order_id, so.`order_id`, so.`shop_id`,
+                       COALESCE(so.`item_subtotal`, 0) AS gross_amount,
+                       COALESCE(so.`commission_amount`, 0) AS commission_amount,
+                       COALESCE(so.`payout_amount`, 0) AS payout_amount,
+                       so.`status`, COALESCE(o.`payment_status`, 'UNKNOWN') AS payment_status,
+                       COALESCE(o.`payment_method`, 'UNKNOWN') AS payment_method,
+                       so.`created_at`
+                FROM `shop_orders` so
+                JOIN `Orders` o ON o.`id` = so.`order_id`
+                WHERE so.`shop_id` = ?
+                ORDER BY so.`created_at` DESC, so.`id` DESC
+                """, this::mapSellerTransaction, shopId);
     }
 
     public SellerAnalyticsResponse sellerAnalytics(Long shopId) {
@@ -797,6 +1034,28 @@ public class MarketplaceModuleService {
         return count != null && count > 0;
     }
 
+    private void notifyShopOwner(Long shopId, String type, String title, String message, String dedupeKey) {
+        try {
+            Long ownerId = jdbcTemplate.queryForObject("SELECT `owner_id` FROM `Shops` WHERE `id` = ?", Long.class, shopId);
+            notifyUser(ownerId, type, title, message, dedupeKey);
+        } catch (DataAccessException ignored) {
+            // Notification must not break the business transaction.
+        }
+    }
+
+    private void notifyUser(Long userId, String type, String title, String message, String dedupeKey) {
+        if (userId == null) return;
+        try {
+            jdbcTemplate.update("""
+                    INSERT INTO `notifications` (`id`, `user_id`, `type`, `title`, `message`, `dedupe_key`, `created_at`)
+                    VALUES (?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
+                    ON DUPLICATE KEY UPDATE `message` = VALUES(`message`)
+                    """, nextId("notifications"), userId, type, title, message, dedupeKey);
+        } catch (DataAccessException ignored) {
+            // Notification must not break the business transaction.
+        }
+    }
+
     private long nextId(String tableName) {
         Long id = jdbcTemplate.queryForObject("SELECT COALESCE(MAX(`id`), 0) + 1 FROM `" + tableName + "`", Long.class);
         return id == null ? 1L : id;
@@ -856,8 +1115,17 @@ public class MarketplaceModuleService {
         return new ProductAdminSummary(rs.getLong("id"), rs.getLong("shop_id"), nullableInt(rs, "cat_id"),
                 rs.getString("category_name"), rs.getString("name"), rs.getString("sku"), money(rs.getBigDecimal("price")),
                 rs.getString("description"), rs.getString("tags"), rs.getString("approval_status"), rs.getString("sale_status"),
-                rs.getString("image_url"), rs.getString("options_json"), rs.getBoolean("requires_personalization"),
+                rs.getString("image_url"), rs.getString("options_json"), rs.getBoolean("is_custom"), rs.getBoolean("requires_personalization"),
                 rs.getInt("processing_days"), rs.getInt("stock"), rs.getInt("low_stock_alert"));
+    }
+
+    private SellerShopProfileSummary mapSellerShopProfile(ResultSet rs, int rowNum) throws SQLException {
+        return new SellerShopProfileSummary(
+                rs.getLong("id"), rs.getString("shop_name"), rs.getString("logo_url"),
+                rs.getString("hero_url"), rs.getString("description"), rs.getString("about"),
+                rs.getString("materials"), rs.getInt("years_experience"),
+                rs.getBoolean("verified_artisan"), rs.getString("status")
+        );
     }
 
     private AdminUserSummary mapAdminUser(ResultSet rs, int rowNum) throws SQLException {
@@ -971,6 +1239,43 @@ public class MarketplaceModuleService {
                 rs.getString("transaction_id"), money(rs.getBigDecimal("amount")), rs.getString("status"));
     }
 
+    private SellerTransactionSummary mapSellerTransaction(ResultSet rs, int rowNum) throws SQLException {
+        return new SellerTransactionSummary(
+                rs.getLong("shop_order_id"),
+                rs.getLong("order_id"),
+                rs.getLong("shop_id"),
+                money(rs.getBigDecimal("gross_amount")),
+                money(rs.getBigDecimal("commission_amount")),
+                money(rs.getBigDecimal("payout_amount")),
+                rs.getString("status"),
+                rs.getString("payment_status"),
+                rs.getString("payment_method"),
+                time(rs.getTimestamp("created_at"))
+        );
+    }
+
+    private CustomOrderRevisionSummary getCustomOrderRevision(Long revisionId) {
+        return jdbcTemplate.queryForObject("""
+                SELECT `id`, `custom_order_id`, `customer_id`, `reason`, `status`, `seller_response`,
+                       `created_at`, `updated_at`
+                FROM `custom_order_revisions`
+                WHERE `id` = ?
+                """, this::mapCustomOrderRevision, revisionId);
+    }
+
+    private CustomOrderRevisionSummary mapCustomOrderRevision(ResultSet rs, int rowNum) throws SQLException {
+        return new CustomOrderRevisionSummary(
+                rs.getLong("id"),
+                rs.getLong("custom_order_id"),
+                rs.getLong("customer_id"),
+                rs.getString("reason"),
+                rs.getString("status"),
+                rs.getString("seller_response"),
+                time(rs.getTimestamp("created_at")),
+                time(rs.getTimestamp("updated_at"))
+        );
+    }
+
     private ReturnRequestSummary getReturnRequest(Long returnId) {
         return jdbcTemplate.queryForObject("""
                 SELECT rr.`id`, rr.`order_id`, rr.`shop_order_id`, rr.`buyer_id`, rr.`shop_id`,
@@ -1023,12 +1328,27 @@ public class MarketplaceModuleService {
     public record CategoryRequest(Long parentId, String name, String slug, String imageUrl, String status) {}
     public record ProductAdminSummary(Long id, Long shopId, Integer categoryId, String categoryName, String name, String sku,
                                       BigDecimal price, String description, String tags, String approvalStatus,
-                                      String saleStatus, String imageUrl, String optionsJson, boolean requiresPersonalization,
-                                      int processingDays, int stock, int lowStockAlert) {}
+                                      String saleStatus, String imageUrl, String optionsJson, boolean customizable, boolean requiresPersonalization,
+                                      int processingDays, int stock, int lowStockAlert) {
+        public ProductAdminSummary(Long id, Long shopId, Integer categoryId, String categoryName, String name, String sku,
+                                   BigDecimal price, String description, String tags, String approvalStatus,
+                                   String saleStatus, String imageUrl, String optionsJson, boolean requiresPersonalization,
+                                   int processingDays, int stock, int lowStockAlert) {
+            this(id, shopId, categoryId, categoryName, name, sku, price, description, tags, approvalStatus,
+                    saleStatus, imageUrl, optionsJson, false, requiresPersonalization, processingDays, stock, lowStockAlert);
+        }
+    }
     public record ProductWriteRequest(Integer categoryId, String name, String sku, BigDecimal price, String description,
                                       String tags, Boolean customizable, String imageUrl, String optionsJson,
                                       Boolean requiresPersonalization, Integer processingDays, Integer stock,
                                       Integer lowStockAlert) {}
+    public record InventoryUpdateRequest(Integer stock, Integer lowStockAlert) {}
+    public record SellerShopProfileSummary(Long id, String shopName, String logoUrl, String heroUrl,
+                                           String description, String about, String materials,
+                                           int yearsExperience, boolean verifiedArtisan, String status) {}
+    public record SellerShopProfileRequest(String shopName, String logoUrl, String heroUrl,
+                                           String description, String about, String materials,
+                                           Integer yearsExperience) {}
     public record AdminUserSummary(Long id, String username, String fullName, String email, String phone, String role,
                                    String status, int ordersCount, BigDecimal totalSpent, BigDecimal sales) {}
     public record AdminUserRequest(String username, String fullName, String email, String phone, String role, String status) {}
@@ -1063,6 +1383,11 @@ public class MarketplaceModuleService {
                                      String description, BigDecimal price, String status, String paymentStatus,
                                      String dueDate, LocalDateTime createdAt, LocalDateTime updatedAt) {}
     public record CustomOrderRequest(Long customerId, Long conversationId, String title, String description, BigDecimal price) {}
+    public record CustomOrderRevisionSummary(Long id, Long customOrderId, Long customerId, String reason,
+                                             String status, String sellerResponse, LocalDateTime createdAt,
+                                             LocalDateTime updatedAt) {}
+    public record CustomOrderRevisionRequest(String reason) {}
+    public record CustomOrderRevisionResolveRequest(String status, String sellerResponse) {}
     public record StatusRequest(String status) {}
     public record CommissionPostSummary(Long id, Long customerId, String title, String description, BigDecimal budgetMin,
                                         BigDecimal budgetMax, String desiredTimeline, String referenceImages,
@@ -1082,6 +1407,9 @@ public class MarketplaceModuleService {
     public record ReportRequest(String type, Long targetId, String reason) {}
     public record ReportUpdateRequest(String status, String adminNote) {}
     public record PaymentHistorySummary(Long id, Long orderId, String method, String transactionId, BigDecimal amount, String status) {}
+    public record SellerTransactionSummary(Long shopOrderId, Long orderId, Long shopId, BigDecimal grossAmount,
+                                           BigDecimal commissionAmount, BigDecimal payoutAmount, String orderStatus,
+                                           String paymentStatus, String paymentMethod, LocalDateTime createdAt) {}
     public record ReturnRequestSummary(Long id, Long orderId, Long shopOrderId, Long buyerId, Long shopId,
                                        String shopName, String reason, String status, BigDecimal refundAmount,
                                        String adminNote, LocalDateTime createdAt, LocalDateTime updatedAt) {}

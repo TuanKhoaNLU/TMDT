@@ -45,4 +45,44 @@ public class CustomOrderController {
         Long effectiveShopId = "SELLER".equalsIgnoreCase(role) ? requestGuard.requireSellerShopId(shopId, tokenShopId, tokenUserId, role) : null;
         return marketplaceModuleService.updateCustomOrderStatus(customOrderId, request, userId, role, effectiveShopId);
     }
+
+    @GetMapping("/v1/custom-orders/revisions")
+    public List<CustomOrderRevisionSummary> customOrderRevisions(
+            @RequestHeader(value = "X-Shop-Id", required = false) Long shopId,
+            @RequestAttribute(value = "shopId", required = false) Long tokenShopId,
+            @RequestAttribute(value = "userId", required = false) Long tokenUserId,
+            @RequestAttribute(value = "role", required = false) String role) {
+        Long userId = requestGuard.requireUserId(tokenUserId);
+        Long effectiveShopId = "SELLER".equalsIgnoreCase(role)
+                ? requestGuard.requireSellerShopId(shopId, tokenShopId, tokenUserId, role)
+                : null;
+        return marketplaceModuleService.listCustomOrderRevisions(userId, role, effectiveShopId);
+    }
+
+    @PostMapping("/v1/custom-orders/{customOrderId}/revisions")
+    public CustomOrderRevisionSummary requestRevision(
+            @RequestAttribute(value = "userId", required = false) Long tokenUserId,
+            @RequestAttribute(value = "role", required = false) String role,
+            @PathVariable Long customOrderId,
+            @RequestBody CustomOrderRevisionRequest request) {
+        if ("SELLER".equalsIgnoreCase(role) || "ADMIN".equalsIgnoreCase(role)) {
+            throw new org.springframework.web.server.ResponseStatusException(
+                    org.springframework.http.HttpStatus.FORBIDDEN, "Chỉ khách hàng được yêu cầu chỉnh sửa.");
+        }
+        return marketplaceModuleService.createCustomOrderRevision(customOrderId,
+                requestGuard.requireUserId(tokenUserId), request);
+    }
+
+    @PutMapping("/v1/custom-orders/revisions/{revisionId}")
+    public CustomOrderRevisionSummary resolveRevision(
+            @RequestHeader(value = "X-Shop-Id", required = false) Long shopId,
+            @RequestAttribute(value = "shopId", required = false) Long tokenShopId,
+            @RequestAttribute(value = "userId", required = false) Long tokenUserId,
+            @RequestAttribute(value = "role", required = false) String role,
+            @PathVariable Long revisionId,
+            @RequestBody CustomOrderRevisionResolveRequest request) {
+        Long sellerShopId = requestGuard.requireSellerShopId(shopId, tokenShopId, tokenUserId, role);
+        return marketplaceModuleService.resolveCustomOrderRevision(revisionId,
+                requestGuard.requireUserId(tokenUserId), sellerShopId, request);
+    }
 }

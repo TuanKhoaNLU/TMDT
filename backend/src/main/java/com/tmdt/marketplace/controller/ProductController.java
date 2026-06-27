@@ -81,4 +81,11 @@ public class ProductController {
             @RequestBody ReviewRequest request) {
         return marketplaceService.addReview(requestGuard.requireUserId(tokenUserId), productId, request);
     }
+
+    @GetMapping("/v1/products/{productId}/review-eligibility")
+    public ReviewEligibilityResponse reviewEligibility(
+            @RequestAttribute(value = "userId", required = false) Long tokenUserId,
+            @PathVariable Long productId) {
+        return marketplaceService.getReviewEligibility(requestGuard.requireUserId(tokenUserId), productId);
+    }
 }

@@ -314,9 +314,11 @@ public class DatabaseInitializer implements ApplicationRunner {
                   `seller_reply` text,
                   `created_at` timestamp DEFAULT CURRENT_TIMESTAMP,
                   `updated_at` timestamp NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-                  INDEX `idx_product_reviews_product` (`product_id`)
+                  INDEX `idx_product_reviews_product` (`product_id`),
+                  UNIQUE KEY `uk_product_reviews_user_product` (`user_id`, `product_id`)
                 )
                 """);
+        addUniqueIndexIfMissing("product_reviews", "uk_product_reviews_user_product", "`user_id`, `product_id`");
         jdbcTemplate.execute("""
                 CREATE TABLE IF NOT EXISTS `product_questions` (
                   `id` bigint PRIMARY KEY,
@@ -465,6 +467,20 @@ public class DatabaseInitializer implements ApplicationRunner {
                   `image_url` varchar(500),
                   `status` varchar(40),
                   `created_at` timestamp DEFAULT CURRENT_TIMESTAMP
+                )
+                """);
+        jdbcTemplate.execute("""
+                CREATE TABLE IF NOT EXISTS `custom_order_revisions` (
+                  `id` bigint PRIMARY KEY,
+                  `custom_order_id` bigint NOT NULL,
+                  `customer_id` bigint NOT NULL,
+                  `reason` text NOT NULL,
+                  `status` varchar(30) DEFAULT 'REQUESTED',
+                  `seller_response` text,
+                  `created_at` timestamp DEFAULT CURRENT_TIMESTAMP,
+                  `updated_at` timestamp NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+                  INDEX `idx_custom_revision_order` (`custom_order_id`),
+                  INDEX `idx_custom_revision_customer` (`customer_id`)
                 )
                 """);
         jdbcTemplate.execute("""
@@ -932,7 +948,7 @@ public class DatabaseInitializer implements ApplicationRunner {
                        ('platform_description', 'Marketplace handmade nhieu seller'),
                        ('commission_bps', '1000'),
                        ('default_shipping_fee', '25000')
-                ON DUPLICATE KEY UPDATE `setting_value` = VALUES(`setting_value`)
+                ON DUPLICATE KEY UPDATE `setting_value` = `setting_value`
                 """);
         jdbcTemplate.update("""
                 INSERT INTO `marketplace_ledger` (`id`, `order_id`, `shop_id`, `entry_type`, `amount`, `note`)
@@ -951,6 +967,21 @@ public class DatabaseInitializer implements ApplicationRunner {
                 """, Integer.class, tableName, columnName);
         if (count != null && count == 0) {
             jdbcTemplate.execute("ALTER TABLE `" + tableName + "` ADD COLUMN " + definition);
+        }
+    }
+
+    private void addUniqueIndexIfMissing(String tableName, String indexName, String columns) {
+        try {
+            Integer count = jdbcTemplate.queryForObject("""
+                    SELECT COUNT(*)
+                    FROM information_schema.statistics
+                    WHERE table_schema = DATABASE() AND table_name = ? AND index_name = ?
+                    """, Integer.class, tableName, indexName);
+            if (count == null || count == 0) {
+                jdbcTemplate.execute("ALTER TABLE `" + tableName + "` ADD UNIQUE KEY `" + indexName + "` (" + columns + ")");
+            }
+        } catch (DataAccessException ex) {
+            log.warn("Could not add unique index {} on {}: {}", indexName, tableName, ex.getMessage());
         }
     }
 }

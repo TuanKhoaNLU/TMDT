@@ -36,6 +36,27 @@ public class SellerController {
         return marketplaceService.answerQuestion(sellerShopId, questionId, request);
     }
 
+    @GetMapping("/v1/seller/shop-profile")
+    public SellerShopProfileSummary sellerShopProfile(
+            @RequestHeader(value = "X-Shop-Id", required = false) Long shopId,
+            @RequestAttribute(value = "shopId", required = false) Long tokenShopId,
+            @RequestAttribute(value = "userId", required = false) Long tokenUserId,
+            @RequestAttribute(value = "role", required = false) String role) {
+        Long sellerShopId = requestGuard.requireSellerShopId(shopId, tokenShopId, tokenUserId, role);
+        return marketplaceModuleService.getSellerShopProfile(sellerShopId);
+    }
+
+    @PutMapping("/v1/seller/shop-profile")
+    public SellerShopProfileSummary updateSellerShopProfile(
+            @RequestHeader(value = "X-Shop-Id", required = false) Long shopId,
+            @RequestAttribute(value = "shopId", required = false) Long tokenShopId,
+            @RequestAttribute(value = "userId", required = false) Long tokenUserId,
+            @RequestAttribute(value = "role", required = false) String role,
+            @RequestBody SellerShopProfileRequest request) {
+        Long sellerShopId = requestGuard.requireSellerShopId(shopId, tokenShopId, tokenUserId, role);
+        return marketplaceModuleService.updateSellerShopProfile(sellerShopId, request);
+    }
+
     @GetMapping("/v1/seller/products")
     public List<ProductAdminSummary> sellerProducts(
             @RequestHeader(value = "X-Shop-Id", required = false) Long shopId,
@@ -64,6 +85,18 @@ public class SellerController {
             @PathVariable Long productId,
             @RequestBody ProductWriteRequest request) {
         return marketplaceModuleService.updateSellerProduct(requestGuard.requireSellerShopId(shopId, tokenShopId, tokenUserId, role), productId, request);
+    }
+
+    @PutMapping("/v1/seller/products/{productId}/inventory")
+    public ProductAdminSummary updateSellerInventory(
+            @RequestHeader(value = "X-Shop-Id", required = false) Long shopId,
+            @RequestAttribute(value = "shopId", required = false) Long tokenShopId,
+            @RequestAttribute(value = "userId", required = false) Long tokenUserId,
+            @RequestAttribute(value = "role", required = false) String role,
+            @PathVariable Long productId,
+            @RequestBody InventoryUpdateRequest request) {
+        Long sellerShopId = requestGuard.requireSellerShopId(shopId, tokenShopId, tokenUserId, role);
+        return marketplaceModuleService.updateSellerInventory(sellerShopId, productId, request);
     }
 
     @PostMapping("/v1/seller/vouchers")
@@ -123,6 +156,16 @@ public class SellerController {
             @RequestAttribute(value = "userId", required = false) Long tokenUserId,
             @RequestAttribute(value = "role", required = false) String role) {
         return marketplaceModuleService.sellerAnalytics(requestGuard.requireSellerShopId(shopId, tokenShopId, tokenUserId, role));
+    }
+
+    @GetMapping("/v1/seller/transactions")
+    public List<SellerTransactionSummary> sellerTransactions(
+            @RequestHeader(value = "X-Shop-Id", required = false) Long shopId,
+            @RequestAttribute(value = "shopId", required = false) Long tokenShopId,
+            @RequestAttribute(value = "userId", required = false) Long tokenUserId,
+            @RequestAttribute(value = "role", required = false) String role) {
+        Long sellerShopId = requestGuard.requireSellerShopId(shopId, tokenShopId, tokenUserId, role);
+        return marketplaceModuleService.sellerTransactions(sellerShopId);
     }
 
     @GetMapping("/v1/seller/orders")

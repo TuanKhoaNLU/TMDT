@@ -1,5 +1,5 @@
 import { useQuery } from "@tanstack/react-query";
-import { AlertTriangle, BarChart3, Image, Loader2, MessageSquare, Package, ShoppingBag, Star, Store, Ticket } from "lucide-react";
+import { AlertTriangle, BarChart3, Image, Loader2, MessageSquare, Package, Settings, ShoppingBag, Star, Store, Ticket, WalletCards } from "lucide-react";
 import { Link } from "react-router-dom";
 import { marketplaceApi } from "../api/marketplaceApi";
 import { formatMoney } from "../utils/format";
@@ -55,8 +55,11 @@ export default function SellerDashboardPage() {
       </section>
 
       <section className="module-grid">
+        <Link className="module-card" to="/seller/profile"><Settings size={20} /><strong>Hồ sơ gian hàng</strong><span>Chỉnh sửa</span><p>Tên, logo, ảnh bìa và câu chuyện shop</p></Link>
         <Link className="module-card" to="/seller/products"><Package size={20} /><strong>Quản lý sản phẩm</strong><span>{data.products}</span><p>Listing, inventory, low stock</p></Link>
         <Link className="module-card" to="/seller/orders"><Store size={20} /><strong>Orders</strong><span>{data.orders}</span><p>Cập nhật kiện hàng theo shop</p></Link>
+        <Link className="module-card" to="/seller/transactions"><WalletCards size={20} /><strong>Giao dịch</strong><span>{formatMoney(data.revenue)}</span><p>Doanh thu, phí nền tảng và thực nhận</p></Link>
+        <Link className="module-card" to="/custom-requests"><ShoppingBag size={20} /><strong>Yêu cầu thiết kế</strong><span>Mở</span><p>Gửi báo giá và bản thảo cho khách</p></Link>
         <Link className="module-card" to="/chat"><MessageSquare size={20} /><strong>Chat</strong><span>{conversations.data?.length || 0}</span><p>Trả lời khách và gửi báo giá</p></Link>
         <Link className="module-card" to="/seller/custom-orders"><ShoppingBag size={20} /><strong>Custom orders</strong><span>{customOrders.data?.length || 0}</span><p>Theo dõi trạng thái chế tác</p></Link>
         <Link className="module-card" to="/seller/media"><Image size={20} /><strong>Media</strong><span>{media.data?.length || 0}</span><p>Thư mục ảnh của shop</p></Link>
