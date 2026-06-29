@@ -4,19 +4,23 @@ import { Link, useLocation, useNavigate } from "react-router-dom";
 import axiosInstance from "../api/axiosInstance";
 import { useAuth } from "../context/AuthContext";
 import { useCart } from "../state/CartContext";
+import { useGoogleAuth } from "../hooks/useGoogleAuth";
 
 export default function LoginPage() {
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
-  const [error, setError] = useState("");
+  const [localError, setLocalError] = useState("");
   const { login } = useAuth();
   const { refreshCart } = useCart();
+  const { signInWithGoogle, loading, error: googleError } = useGoogleAuth();
   const navigate = useNavigate();
   const location = useLocation();
 
+  const error = localError || googleError;
+
   async function handleLogin(event) {
     event.preventDefault();
-    setError("");
+    setLocalError("");
     try {
       const response = await axiosInstance.post("/auth/login", { username, password });
       const { token, ...userData } = response.data;
@@ -24,7 +28,7 @@ export default function LoginPage() {
       await refreshCart();
       navigate("/");
     } catch (err) {
-      setError(err.message || "Đăng nhập thất bại. Vui lòng kiểm tra tài khoản và mật khẩu.");
+      setLocalError(err.message || "Đăng nhập thất bại. Vui lòng kiểm tra tài khoản và mật khẩu.");
     }
   }
 
@@ -57,8 +61,23 @@ export default function LoginPage() {
             <input type="password" value={password} onChange={(event) => setPassword(event.target.value)} required />
           </div>
           <Link className="text-link self-start" to="/forgot-password">Quên mật khẩu?</Link>
-          <button type="submit" className="btn primary w-100">Đăng nhập</button>
+          <button type="submit" className="btn primary w-100" disabled={loading}>
+            {loading ? "Đang xử lý..." : "Đăng nhập"}
+          </button>
         </form>
+
+        <div className="divider"><span>Hoặc</span></div>
+        <button 
+          type="button" 
+          className="btn outline w-100 google-btn" 
+          onClick={signInWithGoogle}
+          disabled={loading}
+          style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', marginTop: '10px' }}
+        >
+          <img src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg" alt="Google Logo" width="20" height="20" />
+          Đăng nhập bằng Google
+        </button>
+
         <div className="auth-footer">Chưa có tài khoản? <Link to="/register">Đăng ký</Link></div>
       </div>
     </div>

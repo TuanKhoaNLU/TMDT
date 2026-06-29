@@ -2,6 +2,7 @@ import React, { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { PackageCheck, ShieldCheck, ShoppingCart, Store } from "lucide-react";
 import axiosInstance from "../api/axiosInstance";
+import { useGoogleAuth } from "../hooks/useGoogleAuth";
 
 export default function RegisterPage() {
   const [mode, setMode] = useState("BUYER");
@@ -16,6 +17,7 @@ export default function RegisterPage() {
   });
   const [error, setError] = useState("");
   const [message, setMessage] = useState("");
+  const { signInWithGoogle, loading, error: googleError } = useGoogleAuth();
   const navigate = useNavigate();
 
   const update = (field) => (event) => {
@@ -76,6 +78,23 @@ export default function RegisterPage() {
 
         {error && <div className="alert-error">{error}</div>}
         {message && <div className="alert-success">{message}</div>}
+        {googleError && <div className="alert-error">{googleError}</div>}
+
+        {mode === "BUYER" && (
+          <>
+            <button 
+              type="button" 
+              className="btn outline w-100 google-btn" 
+              onClick={signInWithGoogle}
+              disabled={loading}
+              style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', marginBottom: '15px' }}
+            >
+              <img src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg" alt="Google Logo" width="20" height="20" />
+              {loading ? "Đang xử lý..." : "Tiếp tục bằng Google"}
+            </button>
+            <div className="divider"><span>Hoặc đăng ký bằng Email</span></div>
+          </>
+        )}
 
         <form onSubmit={handleRegister}>
           <div className="form-group">

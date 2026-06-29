@@ -30,7 +30,6 @@ public class AuthController {
     record ResetPasswordRequest(String email, String otp, String newPassword) {}
     record RefreshRequest(String refreshToken) {}
     record LogoutRequest(String refreshToken) {}
-    record GoogleLoginRequest(String email, String fullName) {}
     record MessageResponse(String message, String otp) {}
     record SellerRegisterRequest(String username, String password, String email, String fullName,
                                  String shopName, String phone, String description) {}
@@ -202,26 +201,52 @@ public class AuthController {
         return new MessageResponse("Da logout", null);
     }
 
+    record GoogleLoginRequest(String accessToken) {}
+
     @PostMapping("/google-login")
     public LoginResponse googleLogin(@RequestBody GoogleLoginRequest request) {
-        if (request.email() == null || request.email().isBlank()) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Thieu email Google");
+        if (request.accessToken() == null || request.accessToken().isBlank()) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Thiếu accessToken Google");
         }
+
+        String email = null;
+        String fullName = null;
+
+        try {
+            org.springframework.web.client.RestTemplate restTemplate = new org.springframework.web.client.RestTemplate();
+            org.springframework.http.HttpHeaders headers = new org.springframework.http.HttpHeaders();
+            headers.setBearerAuth(request.accessToken());
+            org.springframework.http.HttpEntity<String> entity = new org.springframework.http.HttpEntity<>("", headers);
+            var response = restTemplate.exchange("https://www.googleapis.com/oauth2/v3/userinfo", 
+                    org.springframework.http.HttpMethod.GET, entity, Map.class);
+            Map<String, Object> body = response.getBody();
+            if (body != null) {
+                email = (String) body.get("email");
+                fullName = (String) body.get("name");
+            }
+        } catch (Exception e) {
+            throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Google token không hợp lệ");
+        }
+
+        if (email == null) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Không lấy được thông tin email từ Google");
+        }
+
         Long accountId;
         Long userId;
         try {
-            Map<String, Object> row = jdbcTemplate.queryForMap("SELECT id, user_id FROM Accounts WHERE email = ?", request.email());
+            Map<String, Object> row = jdbcTemplate.queryForMap("SELECT id, user_id FROM Accounts WHERE email = ?", email);
             accountId = ((Number) row.get("id")).longValue();
             userId = ((Number) row.get("user_id")).longValue();
         } catch (EmptyResultDataAccessException ex) {
             userId = nextId("Users");
             accountId = nextId("Accounts");
-            jdbcTemplate.update("INSERT INTO Users (id, full_name, status) VALUES (?, ?, 'ACTIVE')", userId, request.fullName());
+            jdbcTemplate.update("INSERT INTO Users (id, full_name, status) VALUES (?, ?, 'ACTIVE')", userId, fullName);
             jdbcTemplate.update("INSERT INTO Accounts (id, user_id, username, password_hash, email, role, status) VALUES (?, ?, ?, '{noop}GOOGLE', ?, 'BUYER', 1)",
-                    accountId, userId, request.email(), request.email());
+                    accountId, userId, email, email);
         }
         String token = jwtUtil.generateToken(userId, "BUYER", firstShopId(userId));
-        return new LoginResponse(token, issueRefreshToken(accountId), userId, "BUYER", firstShopId(userId), request.fullName(), "ACTIVE");
+        return new LoginResponse(token, issueRefreshToken(accountId), userId, "BUYER", firstShopId(userId), fullName, "ACTIVE");
     }
 
     private String issueRefreshToken(long accountId) {
