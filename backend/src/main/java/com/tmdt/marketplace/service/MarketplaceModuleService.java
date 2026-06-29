@@ -1,28 +1,45 @@
 package com.tmdt.marketplace.service;
 
 import org.springframework.dao.DataAccessException;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.core.io.Resource;
+import org.springframework.core.io.UrlResource;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.util.StringUtils;
 import org.springframework.web.server.ResponseStatusException;
 import org.springframework.http.HttpStatus;
+import org.springframework.web.multipart.MultipartFile;
 
 import java.math.BigDecimal;
+import java.io.IOException;
+import java.net.MalformedURLException;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Timestamp;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
+import java.util.Optional;
 import java.util.Set;
+import java.util.UUID;
 
 @Service
 public class MarketplaceModuleService {
 
     private final JdbcTemplate jdbcTemplate;
+    private final Path chatUploadDir;
 
-    public MarketplaceModuleService(JdbcTemplate jdbcTemplate) {
+    public MarketplaceModuleService(
+            JdbcTemplate jdbcTemplate,
+            @Value("${chat.upload-dir:uploads/chat}") String chatUploadDir) {
         this.jdbcTemplate = jdbcTemplate;
+        this.chatUploadDir = Paths.get(chatUploadDir).toAbsolutePath().normalize();
     }
 
     public MarketplaceModulesResponse modules() {
@@ -538,6 +555,7 @@ public class MarketplaceModuleService {
         ensureConversationAccess(conversationId, userId, role, shopId);
         return jdbcTemplate.query("""
                 SELECT `id`, `conversation_id`, `sender_id`, `sender_role`, `message_type`, `body`, `image_url`,
+                       `attachment_url`, `attachment_name`, `attachment_content_type`, `attachment_size`,
                        `custom_order_id`, `created_at`
                 FROM `chat_messages`
                 WHERE `conversation_id` = ?
@@ -547,17 +565,132 @@ public class MarketplaceModuleService {
 
     public MessageSummary sendMessage(Long userId, String role, Long conversationId, Long shopId, MessageRequest request) {
         ensureConversationAccess(conversationId, userId, role, shopId);
-        requireText(request.body(), "Tin nhan khong duoc rong.");
+        if (!StringUtils.hasText(request.body()) && !StringUtils.hasText(request.imageUrl()) && !StringUtils.hasText(request.attachmentUrl())) {
+            throw badRequest("Tin nhan khong duoc rong.");
+        }
         long id = nextId("chat_messages");
         String senderRole = role == null ? "CUSTOMER" : role;
+        String messageType = StringUtils.hasText(request.messageType())
+                ? request.messageType().trim().toUpperCase()
+                : StringUtils.hasText(request.attachmentUrl()) ? "FILE" : "TEXT";
+        String lastMessage = lastMessagePreview(request, messageType);
         jdbcTemplate.update("""
-                INSERT INTO `chat_messages` (`id`, `conversation_id`, `sender_id`, `sender_role`, `message_type`, `body`, `image_url`, `custom_order_id`)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-                """, id, conversationId, userId, senderRole, request.messageType() == null ? "TEXT" : request.messageType(),
-                request.body(), request.imageUrl(), request.customOrderId());
-        jdbcTemplate.update("UPDATE `chat_conversations` SET `last_message` = ?, `updated_at` = CURRENT_TIMESTAMP WHERE `id` = ?",
-                request.body(), conversationId);
+                INSERT INTO `chat_messages` (`id`, `conversation_id`, `sender_id`, `sender_role`, `message_type`, `body`, `image_url`,
+                  `attachment_url`, `attachment_name`, `attachment_content_type`, `attachment_size`, `custom_order_id`)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                """, id, conversationId, userId, senderRole, messageType, request.body(), request.imageUrl(),
+                request.attachmentUrl(), request.attachmentName(), request.attachmentContentType(),
+                request.attachmentSize() == null ? 0 : Math.max(0, request.attachmentSize()), request.customOrderId());
+        jdbcTemplate.update("""
+                UPDATE `chat_conversations`
+                SET `last_message` = ?,
+                    `customer_unread` = CASE WHEN ? = 'SELLER' THEN COALESCE(`customer_unread`, 0) + 1 ELSE `customer_unread` END,
+                    `seller_unread` = CASE WHEN ? <> 'SELLER' THEN COALESCE(`seller_unread`, 0) + 1 ELSE `seller_unread` END,
+                    `updated_at` = CURRENT_TIMESTAMP
+                WHERE `id` = ?
+                """, lastMessage, senderRole, senderRole, conversationId);
         return listMessages(conversationId, userId, role, shopId).stream().filter(message -> message.id().equals(id)).findFirst().orElseThrow();
+    }
+
+    public void unsendMessage(Long messageId, Long userId, String role, Long shopId) {
+        String senderRole = role == null ? "CUSTOMER" : role;
+        
+        // 1. Kiểm tra tin nhắn có tồn tại và thuộc về user/role này không
+        List<Map<String, Object>> msgs = jdbcTemplate.queryForList(
+                "SELECT * FROM `chat_messages` WHERE `id` = ? AND `sender_id` = ? AND `sender_role` = ?",
+                messageId, userId, senderRole);
+                
+        if (msgs.isEmpty()) {
+            throw badRequest("Không tìm thấy tin nhắn hoặc bạn không có quyền thu hồi tin nhắn này.");
+        }
+        
+        Long conversationId = ((Number) msgs.get(0).get("conversation_id")).longValue();
+        ensureConversationAccess(conversationId, userId, role, shopId);
+
+        // 2. Thu hồi tin nhắn
+        jdbcTemplate.update("""
+                UPDATE `chat_messages`
+                SET `message_type` = 'RECALLED',
+                    `body` = NULL,
+                    `image_url` = NULL,
+                    `attachment_url` = NULL,
+                    `attachment_name` = NULL,
+                    `attachment_content_type` = NULL,
+                    `attachment_size` = 0,
+                    `custom_order_id` = NULL
+                WHERE `id` = ?
+                """, messageId);
+    }
+
+    public ChatAttachmentResponse uploadChatAttachment(Long userId, String role, Long conversationId, Long shopId, MultipartFile file) {
+        ensureConversationAccess(conversationId, userId, role, shopId);
+        if (file == null || file.isEmpty()) {
+            throw badRequest("Vui long chon file can gui.");
+        }
+        if (file.getSize() > 8 * 1024 * 1024) {
+            throw badRequest("File chat khong duoc vuot qua 8MB.");
+        }
+        String contentType = Optional.ofNullable(file.getContentType()).orElse("application/octet-stream");
+        if (!isAllowedChatAttachment(contentType)) {
+            throw badRequest("Chi ho tro anh, PDF, Word, Excel, text hoac file nen zip.");
+        }
+        String originalName = StringUtils.cleanPath(Optional.ofNullable(file.getOriginalFilename()).orElse("attachment"));
+        if (originalName.contains("..")) {
+            throw badRequest("Ten file khong hop le.");
+        }
+        String extension = extensionOf(originalName);
+        String storedName = UUID.randomUUID() + extension;
+        try {
+            Files.createDirectories(chatUploadDir);
+            Path target = chatUploadDir.resolve(storedName).normalize();
+            if (!target.startsWith(chatUploadDir)) {
+                throw badRequest("Duong dan file khong hop le.");
+            }
+            file.transferTo(target);
+        } catch (IOException ex) {
+            throw new ResponseStatusException(HttpStatus.INTERNAL_SERVER_ERROR, "Khong luu duoc file chat.");
+        }
+        String url = "/api/v1/chat/attachments/" + storedName;
+        return new ChatAttachmentResponse(url, originalName, contentType, file.getSize(), contentType.startsWith("image/"));
+    }
+
+    public ChatAttachmentFile getChatAttachment(Long userId, String role, Long shopId, String storedName) {
+        String cleanName = StringUtils.cleanPath(storedName == null ? "" : storedName);
+        if (!StringUtils.hasText(cleanName) || cleanName.contains("..")) {
+            throw badRequest("Ten file khong hop le.");
+        }
+        ChatAttachmentMeta meta = findChatAttachmentMeta(cleanName)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Khong tim thay file chat."));
+        ensureConversationAccess(meta.conversationId(), userId, role, shopId);
+        Path filePath = chatUploadDir.resolve(cleanName).normalize();
+        if (!filePath.startsWith(chatUploadDir) || !Files.exists(filePath)) {
+            throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Khong tim thay file chat.");
+        }
+        try {
+            Resource resource = new UrlResource(filePath.toUri());
+            return new ChatAttachmentFile(resource, meta.fileName(), meta.contentType());
+        } catch (MalformedURLException ex) {
+            throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Khong doc duoc file chat.");
+        }
+    }
+
+    public ChatAttachmentFile getChatAttachmentPublic(String storedName) {
+        String cleanName = StringUtils.cleanPath(storedName == null ? "" : storedName);
+        if (!StringUtils.hasText(cleanName) || cleanName.contains("..")) {
+            throw badRequest("Ten file khong hop le.");
+        }
+        ChatAttachmentMeta meta = findChatAttachmentMeta(cleanName)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Khong tim thay file chat."));
+        Path filePath = chatUploadDir.resolve(cleanName).normalize();
+        if (!filePath.startsWith(chatUploadDir) || !Files.exists(filePath)) {
+            throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Khong tim thay file chat.");
+        }
+        try {
+            Resource resource = new UrlResource(filePath.toUri());
+            return new ChatAttachmentFile(resource, meta.fileName(), meta.contentType());
+        } catch (MalformedURLException ex) {
+            throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Khong doc duoc file chat.");
+        }
     }
 
     @Transactional
@@ -636,12 +769,15 @@ public class MarketplaceModuleService {
         requireText(request.status(), "Thieu status.");
         String nextStatus = request.status().trim().toUpperCase();
         Map<String, Object> order = jdbcTemplate.queryForMap("""
-                SELECT `customer_id`, `shop_id`
+                SELECT `customer_id`, `shop_id`, `status`, `payment_status`
                 FROM `custom_orders`
                 WHERE `id` = ?
                 """, customOrderId);
         Long customerId = ((Number) order.get("customer_id")).longValue();
         Long orderShopId = ((Number) order.get("shop_id")).longValue();
+        String currentStatus = String.valueOf(order.get("status")).toUpperCase();
+        String paymentStatus = String.valueOf(order.get("payment_status")).toUpperCase();
+
         if ("ADMIN".equalsIgnoreCase(role)) {
             // admin is allowed
         } else if ("SELLER".equalsIgnoreCase(role)) {
@@ -651,10 +787,21 @@ public class MarketplaceModuleService {
             if (!Set.of("CRAFTING", "FINISHING", "SHIPPED", "DELIVERED", "CANCELLED").contains(nextStatus)) {
                 throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Người bán không được chuyển sang trạng thái này");
             }
+            if (Set.of("CRAFTING", "FINISHING", "SHIPPED", "DELIVERED").contains(nextStatus) && !"PAID".equals(paymentStatus)) {
+                throw badRequest("Khách hàng chưa thanh toán. Sàn chưa giữ tiền nên bạn không thể bắt đầu chế tác.");
+            }
         } else if (!customerId.equals(userId)) {
             throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Tai khoan khong quan ly don nay");
-        } else if (!Set.of("AWAITING_PAYMENT", "CANCELLED").contains(nextStatus)) {
-            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Khách hàng chỉ có thể chấp nhận báo giá hoặc hủy yêu cầu");
+        } else {
+            if (!Set.of("AWAITING_PAYMENT", "CANCELLED", "DISPUTED", "COMPLETED").contains(nextStatus)) {
+                throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Khách hàng chỉ có thể đổi sang các trạng thái cho phép.");
+            }
+            if ("DISPUTED".equals(nextStatus) && !"REVISION_REJECTED".equals(currentStatus)) {
+                throw badRequest("Chỉ có thể khiếu nại khi yêu cầu chỉnh sửa bị từ chối.");
+            }
+            if ("COMPLETED".equals(nextStatus) && !"DELIVERED".equals(currentStatus)) {
+                throw badRequest("Chỉ có thể nghiệm thu khi đơn hàng đã được giao (DELIVERED).");
+            }
         }
         jdbcTemplate.update("UPDATE `custom_orders` SET `status` = ?, `updated_at` = CURRENT_TIMESTAMP WHERE `id` = ?",
                 nextStatus, customOrderId);
@@ -1002,6 +1149,62 @@ public class MarketplaceModuleService {
                 """, this::mapConversation, id);
     }
 
+    private String lastMessagePreview(MessageRequest request, String messageType) {
+        if (StringUtils.hasText(request.body())) {
+            return request.body().trim();
+        }
+        if (StringUtils.hasText(request.attachmentName())) {
+            return "Da gui file: " + request.attachmentName();
+        }
+        if (StringUtils.hasText(request.imageUrl())) {
+            return "Da gui hinh anh";
+        }
+        return "Tin nhan moi";
+    }
+
+    private boolean isAllowedChatAttachment(String contentType) {
+        String type = contentType == null ? "" : contentType.toLowerCase();
+        return type.startsWith("image/")
+                || Set.of(
+                "application/pdf",
+                "text/plain",
+                "application/msword",
+                "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+                "application/vnd.ms-excel",
+                "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                "application/zip",
+                "application/x-zip-compressed"
+        ).contains(type);
+    }
+
+    private String extensionOf(String filename) {
+        int index = filename.lastIndexOf('.');
+        if (index < 0 || index == filename.length() - 1) {
+            return "";
+        }
+        String extension = filename.substring(index).toLowerCase();
+        return extension.length() > 12 ? "" : extension.replaceAll("[^a-z0-9.]", "");
+    }
+
+    private Optional<ChatAttachmentMeta> findChatAttachmentMeta(String storedName) {
+        String attachmentUrl = "/api/v1/chat/attachments/" + storedName;
+        return jdbcTemplate.query("""
+                SELECT `conversation_id`, `attachment_name`, `attachment_content_type`
+                FROM `chat_messages`
+                WHERE `attachment_url` = ?
+                LIMIT 1
+                """, rs -> {
+            if (!rs.next()) {
+                return Optional.empty();
+            }
+            return Optional.of(new ChatAttachmentMeta(
+                    rs.getLong("conversation_id"),
+                    rs.getString("attachment_name"),
+                    rs.getString("attachment_content_type")
+            ));
+        }, attachmentUrl);
+    }
+
     private void ensureConversationAccess(Long conversationId, Long userId, String role, Long shopId) {
         Map<String, Object> row = jdbcTemplate.queryForMap("""
                 SELECT `customer_id`, `shop_id`
@@ -1197,7 +1400,9 @@ public class MarketplaceModuleService {
 
     private MessageSummary mapMessage(ResultSet rs, int rowNum) throws SQLException {
         return new MessageSummary(rs.getLong("id"), rs.getLong("conversation_id"), rs.getLong("sender_id"), rs.getString("sender_role"),
-                rs.getString("message_type"), rs.getString("body"), rs.getString("image_url"), nullableLong(rs, "custom_order_id"),
+                rs.getString("message_type"), rs.getString("body"), rs.getString("image_url"),
+                rs.getString("attachment_url"), rs.getString("attachment_name"), rs.getString("attachment_content_type"),
+                rs.getLong("attachment_size"), nullableLong(rs, "custom_order_id"),
                 time(rs.getTimestamp("created_at")));
     }
 
@@ -1376,8 +1581,18 @@ public class MarketplaceModuleService {
                                       String lastMessage, int customerUnread, int sellerUnread, LocalDateTime updatedAt) {}
     public record ConversationRequest(Long shopId, Long productId) {}
     public record MessageSummary(Long id, Long conversationId, Long senderId, String senderRole, String messageType,
-                                 String body, String imageUrl, Long customOrderId, LocalDateTime createdAt) {}
-    public record MessageRequest(String messageType, String body, String imageUrl, Long customOrderId) {}
+                                 String body, String imageUrl, String attachmentUrl, String attachmentName,
+                                 String attachmentContentType, long attachmentSize, Long customOrderId, LocalDateTime createdAt) {
+        public MessageSummary(Long id, Long conversationId, Long senderId, String senderRole, String messageType,
+                              String body, String imageUrl, Long customOrderId, LocalDateTime createdAt) {
+            this(id, conversationId, senderId, senderRole, messageType, body, imageUrl, null, null, null, 0L, customOrderId, createdAt);
+        }
+    }
+    public record MessageRequest(String messageType, String body, String imageUrl, String attachmentUrl,
+                                 String attachmentName, String attachmentContentType, Long attachmentSize, Long customOrderId) {}
+    public record ChatAttachmentResponse(String url, String fileName, String contentType, long size, boolean image) {}
+    public record ChatAttachmentFile(Resource resource, String fileName, String contentType) {}
+    private record ChatAttachmentMeta(Long conversationId, String fileName, String contentType) {}
     public record CustomQuoteRequest(String title, String description, BigDecimal price) {}
     public record CustomOrderSummary(Long id, Long customerId, Long shopId, Long conversationId, String title,
                                      String description, BigDecimal price, String status, String paymentStatus,

@@ -26,6 +26,24 @@ export const marketplaceApi = {
   startConversation: (payload) => axiosInstance.post("/chat/conversations", payload).then((res) => res.data),
   messages: (conversationId) => axiosInstance.get(`/chat/conversations/${conversationId}/messages`).then((res) => res.data),
   sendMessage: (conversationId, payload) => axiosInstance.post(`/chat/conversations/${conversationId}/messages`, payload).then((res) => res.data),
+  unsendMessage: (messageId) => axiosInstance.delete(`/chat/messages/${messageId}`).then((res) => res.data),
+  uploadChatAttachment: async (conversationId, file) => {
+    const formData = new FormData();
+    formData.append("file", file);
+    const token = localStorage.getItem("auth_token");
+    const headers = {};
+    if (token) headers["Authorization"] = `Bearer ${token}`;
+    const res = await fetch(`${import.meta.env.VITE_API_URL || "/api/v1"}/chat/conversations/${conversationId}/attachments`, {
+      method: "POST",
+      body: formData,
+      headers
+    });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new Error(err.message || "Lỗi tải file lên");
+    }
+    return res.json();
+  },
   sendCustomQuote: (conversationId, payload) => axiosInstance.post(`/chat/conversations/${conversationId}/custom-quotes`, payload).then((res) => res.data),
   customOrders: () => axiosInstance.get("/custom-orders").then((res) => res.data),
   updateCustomOrderStatus: (customOrderId, payload) => axiosInstance.put(`/custom-orders/${customOrderId}/status`, payload).then((res) => res.data),

@@ -1,7 +1,7 @@
 import { useQuery } from "@tanstack/react-query";
 import { AlertCircle, Loader2, Plus, RotateCcw, ShieldCheck, ShoppingCart, SlidersHorizontal, Sparkles, Store, Ticket } from "lucide-react";
 import { Link, useSearchParams } from "react-router-dom";
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import { marketplaceApi } from "../api/marketplaceApi";
 import { StatusBadge } from "../components/StatusBadge";
 import { useCart } from "../state/CartContext";
@@ -10,6 +10,7 @@ import { formatMoney } from "../utils/format";
 export default function ProductsPage() {
   const { addItem } = useCart();
   const [searchParams, setSearchParams] = useSearchParams();
+  const [actionError, setActionError] = useState("");
   const { data: products = [], isLoading, error } = useQuery({
     queryKey: ["products"],
     queryFn: marketplaceApi.products
@@ -52,8 +53,16 @@ export default function ProductsPage() {
   const activeProducts = products.filter((product) => product.status === "active" && Number(product.stock) > 0);
   const shopCount = new Set(products.map((product) => product.shopName)).size;
 
-  async function handleAdd(productId) {
-    await addItem(productId, 1);
+  async function handleAdd(product) {
+    setActionError("");
+    try {
+      const extras = product.requiresPersonalization
+        ? { note: "Khach se bo sung noi dung ca nhan hoa sau" }
+        : {};
+      await addItem(product.id, 1, extras);
+    } catch (err) {
+      setActionError(err.message || "Khong the them san pham vao gio hang.");
+    }
   }
 
   function updateParam(name, value) {
@@ -196,6 +205,7 @@ export default function ProductsPage() {
               <ShoppingCart size={18} /> Xem giỏ hàng
             </Link>
           </div>
+          {actionError && <section className="alert error"><AlertCircle size={18} /> {actionError}</section>}
 
           {!visibleProducts.length ? (
             <section className="empty-state compact-empty">
@@ -229,7 +239,7 @@ export default function ProductsPage() {
                       </div>
                       <div className="product-actions">
                         <span className={available ? "stock-text" : "danger"}>Tồn kho: {product.stock}</span>
-                        <button className="btn primary" disabled={!available} onClick={() => handleAdd(product.id)}>
+                        <button className="btn primary" disabled={!available} onClick={() => handleAdd(product)}>
                           <Plus size={17} /> Thêm vào giỏ
                         </button>
                       </div>

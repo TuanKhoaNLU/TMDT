@@ -1,5 +1,6 @@
-import { Navigate, Route, Routes } from "react-router-dom";
+import { Navigate, Route, Routes, useLocation } from "react-router-dom";
 import { Layout } from "./components/Layout";
+import { useAuth } from "./context/AuthContext";
 import AdminOrdersPage from "./pages/AdminOrdersPage";
 import AdminDashboardPage from "./pages/AdminDashboardPage";
 import CartPage from "./pages/CartPage";
@@ -29,6 +30,31 @@ import CustomRequestsPage from "./pages/CustomRequestsPage";
 import SellerTransactionsPage from "./pages/SellerTransactionsPage";
 import SellerShopProfilePage from "./pages/SellerShopProfilePage";
 
+function ProtectedRoute({ children, roles, requireShop = false }) {
+  const { user, token } = useAuth();
+  const location = useLocation();
+
+  if (!user || !token) {
+    return (
+      <Navigate
+        to="/login"
+        replace
+        state={{ from: location, message: "Vui long dang nhap de tiep tuc." }}
+      />
+    );
+  }
+
+  const userRole = String(user.role || "").toUpperCase();
+  const allowedRoles = roles?.map((role) => role.toUpperCase());
+  const hasRole = !allowedRoles?.length || allowedRoles.includes(userRole);
+
+  if (!hasRole || (requireShop && !user.shopId)) {
+    return <Navigate to="/" replace />;
+  }
+
+  return children;
+}
+
 export default function App() {
   return (
     <Routes>
@@ -40,29 +66,29 @@ export default function App() {
         <Route index element={<ProductsPage />} />
         <Route path="/products/:productId" element={<ProductDetailPage />} />
         <Route path="/shops/:shopId" element={<ShopPage />} />
-        <Route path="/profile" element={<ProfilePage />} />
-        <Route path="/wishlist" element={<WishlistPage />} />
-        <Route path="/chat" element={<ChatPage />} />
-        <Route path="/custom-requests" element={<CustomRequestsPage />} />
-        <Route path="/custom-orders" element={<CustomOrdersPage />} />
-        <Route path="/notifications" element={<NotificationsPage />} />
-        <Route path="/modules" element={<MarketplaceModulesPage />} />
+        <Route path="/profile" element={<ProtectedRoute><ProfilePage /></ProtectedRoute>} />
+        <Route path="/wishlist" element={<ProtectedRoute roles={["BUYER"]}><WishlistPage /></ProtectedRoute>} />
+        <Route path="/chat" element={<ProtectedRoute roles={["BUYER", "SELLER"]}><ChatPage /></ProtectedRoute>} />
+        <Route path="/custom-requests" element={<ProtectedRoute roles={["BUYER", "SELLER"]}><CustomRequestsPage /></ProtectedRoute>} />
+        <Route path="/custom-orders" element={<ProtectedRoute roles={["BUYER", "SELLER"]}><CustomOrdersPage /></ProtectedRoute>} />
+        <Route path="/notifications" element={<ProtectedRoute><NotificationsPage /></ProtectedRoute>} />
+        <Route path="/modules" element={<ProtectedRoute roles={["ADMIN"]}><MarketplaceModulesPage /></ProtectedRoute>} />
         <Route path="/cart" element={<CartPage />} />
-        <Route path="/checkout" element={<CheckoutPage />} />
+        <Route path="/checkout" element={<ProtectedRoute roles={["BUYER"]}><CheckoutPage /></ProtectedRoute>} />
         <Route path="/payment-result" element={<PaymentResultPage />} />
-        <Route path="/orders" element={<OrdersPage />} />
-        <Route path="/orders/:orderId" element={<OrderDetailPage />} />
-        <Route path="/seller" element={<SellerDashboardPage />} />
-        <Route path="/seller/profile" element={<SellerShopProfilePage />} />
-        <Route path="/seller/products" element={<CatalogManagementPage />} />
-        <Route path="/seller/custom-orders" element={<CustomOrdersPage />} />
-        <Route path="/seller/media" element={<MediaLibraryPage />} />
-        <Route path="/seller/orders" element={<SellerOrdersPage />} />
-        <Route path="/seller/transactions" element={<SellerTransactionsPage />} />
-        <Route path="/admin" element={<AdminDashboardPage />} />
-        <Route path="/admin/manage" element={<AdminManagementPage />} />
-        <Route path="/admin/catalog" element={<CatalogManagementPage />} />
-        <Route path="/admin/orders" element={<AdminOrdersPage />} />
+        <Route path="/orders" element={<ProtectedRoute roles={["BUYER"]}><OrdersPage /></ProtectedRoute>} />
+        <Route path="/orders/:orderId" element={<ProtectedRoute roles={["BUYER"]}><OrderDetailPage /></ProtectedRoute>} />
+        <Route path="/seller" element={<ProtectedRoute roles={["SELLER"]} requireShop><SellerDashboardPage /></ProtectedRoute>} />
+        <Route path="/seller/profile" element={<ProtectedRoute roles={["SELLER"]} requireShop><SellerShopProfilePage /></ProtectedRoute>} />
+        <Route path="/seller/products" element={<ProtectedRoute roles={["SELLER"]} requireShop><CatalogManagementPage /></ProtectedRoute>} />
+        <Route path="/seller/custom-orders" element={<ProtectedRoute roles={["SELLER"]} requireShop><CustomOrdersPage /></ProtectedRoute>} />
+        <Route path="/seller/media" element={<ProtectedRoute roles={["SELLER"]} requireShop><MediaLibraryPage /></ProtectedRoute>} />
+        <Route path="/seller/orders" element={<ProtectedRoute roles={["SELLER"]} requireShop><SellerOrdersPage /></ProtectedRoute>} />
+        <Route path="/seller/transactions" element={<ProtectedRoute roles={["SELLER"]} requireShop><SellerTransactionsPage /></ProtectedRoute>} />
+        <Route path="/admin" element={<ProtectedRoute roles={["ADMIN"]}><AdminDashboardPage /></ProtectedRoute>} />
+        <Route path="/admin/manage" element={<ProtectedRoute roles={["ADMIN"]}><AdminManagementPage /></ProtectedRoute>} />
+        <Route path="/admin/catalog" element={<ProtectedRoute roles={["ADMIN"]}><CatalogManagementPage /></ProtectedRoute>} />
+        <Route path="/admin/orders" element={<ProtectedRoute roles={["ADMIN"]}><AdminOrdersPage /></ProtectedRoute>} />
       </Route>
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>

@@ -1716,7 +1716,8 @@ public class MarketplaceService {
                 rs.getString("image"),
                 shopName,
                 rs.getString("status"),
-                rs.getInt("stock")
+                rs.getInt("stock"),
+                rs.getBoolean("requires_personalization")
         );
     }
 
@@ -2293,16 +2294,16 @@ public class MarketplaceService {
         return List.of(
                 new ProductCard(1L, 1L, "Luna Press", "Petals & Parchment", "Thiep handmade",
                         BigDecimal.valueOf(240000), false, "https://picsum.photos/seed/petals-parchment/640/480",
-                        "Luna Press", "active", 24),
+                        "Luna Press", "active", 24, false),
                 new ProductCard(2L, 2L, "Golden Fold", "Golden Solstice", "Qua tang custom",
                         BigDecimal.valueOf(360000), true, "https://picsum.photos/seed/golden-solstice/640/480",
-                        "Golden Fold", "active", 12),
+                        "Golden Fold", "active", 12, true),
                 new ProductCard(3L, 3L, "Indigo Studio", "Indigo Dreams", "Qua tang custom",
                         BigDecimal.valueOf(480000), true, "https://picsum.photos/seed/indigo-dreams/640/480",
-                        "Indigo Studio", "active", 10),
+                        "Indigo Studio", "active", 10, true),
                 new ProductCard(4L, 1L, "Luna Press", "Botanical Keepsake", "Decor thu cong",
                         BigDecimal.valueOf(520000), true, "https://picsum.photos/seed/botanical-keepsake/640/480",
-                        "Luna Press", "active", 8)
+                        "Luna Press", "active", 8, true)
         );
     }
 
@@ -2400,7 +2401,8 @@ public class MarketplaceService {
             String image,
             String artisan,
             String status,
-            int stock
+            int stock,
+            boolean requiresPersonalization
     ) {
     }
 

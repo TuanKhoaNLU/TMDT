@@ -1,0 +1,720 @@
+Bạn là giáo viên lập trình Java. Hãy tạo bộ câu hỏi trắc nghiệm từ nội dung tôi cung cấp bên dưới.
+
+Yêu cầu:
+
+1. Mỗi câu hỏi phải có đúng 4 đáp án: A, B, C, D.
+2. Chỉ có 1 đáp án đúng.
+3. Nếu câu gốc có 5 đáp án A/B/C/D/E, hãy chuyển thành 4 đáp án A/B/C/D nhưng vẫn giữ đáp án đúng.
+4. Nếu câu gốc bị thiếu đáp án hoặc có đáp án ghi “ảnh không thấy”, hãy tự tạo phương án nhiễu hợp lý.
+5. Giữ nguyên các đoạn code Java trong câu hỏi.
+6. Đáp án sai phải hợp lý, dễ gây nhầm lẫn nhưng không được sai ngữ pháp quá rõ.
+7. Sau mỗi câu, ghi:
+
+   * Đáp án đúng
+   * Giải thích ngắn gọn vì sao đúng
+8. Không tạo câu hỏi ngoài chủ đề Java.
+9. Không bỏ sót câu hỏi nào trong nội dung được cung cấp.
+10. Ngôn ngữ sử dụng: tiếng Việt.
+
+Định dạng đầu ra:
+
+Câu 1: [Nội dung câu hỏi]
+
+```java
+[Đoạn code nếu có]
+```
+
+A) ...
+B) ...
+C) ...
+D) ...
+
+Đáp án đúng: ...
+Giải thích: ...
+
+Bây giờ hãy tạo câu hỏi trắc nghiệm từ nội dung sau:
+
+[Dán nội dung đề/câu hỏi Java vào đây]
+# DANH SÁCH CÂU HỎI JAVA KÈM ĐÁP ÁN VÀ GIẢI THÍCH
+
+## Câu 3
+
+Cho trước đoạn chương trình sau:
+
+```java
+public abstract class AbstractTest {
+    static int i;
+    abstract int test();
+
+    AbstractTest() {
+        System.out.print("A:");
+    }
+}
+
+class Test extends AbstractTest {
+    int test() {
+        return i;
+    }
+
+    public static void main(String[] args) {
+        Test t = new Test();
+        System.out.println(t.test());
+    }
+}
+```
+
+Kết quả sẽ là gì khi biên dịch và chạy chương trình?
+
+A) Xuất ra `"0"`
+B) Xuất ra `"A:0"`
+C) Lỗi cú pháp `Syntax error`
+D) Xuất ra `"A"`
+
+**Đáp án: B) Xuất ra `"A:0"`**
+
+**Giải thích:** Khi tạo `new Test()`, constructor của lớp cha `AbstractTest` chạy trước nên in `A:`. Biến `static int i` chưa gán giá trị nên mặc định là `0`. Vì vậy kết quả là `A:0`.
+
+---
+
+## Câu 4
+
+Cho trước đoạn chương trình sau:
+
+```java
+System.out.println(3 + 6 + "String");
+```
+
+Kết quả sẽ là gì khi biên dịch và chạy chương trình?
+
+A) Xuất ra: `36String`
+B) Lỗi khi chạy
+C) Lỗi biên dịch
+D) Xuất ra: `9String`
+
+**Đáp án: D) Xuất ra: `9String`**
+
+**Giải thích:** Java tính từ trái sang phải. Trước tiên `3 + 6 = 9`, sau đó mới nối với chuỗi `"String"`, nên kết quả là `9String`.
+
+---
+
+## Câu 5
+
+Phát biểu nào đúng với `java.util.ArrayList`?
+
+A) Các thành phần trong tập hợp được đảm bảo là duy nhất
+B) Các thành phần trong tập hợp được truy xuất dùng một khóa duy nhất
+C) Ảnh bị cắt, không thấy phương án C
+D) Ảnh bị cắt, không thấy phương án D
+
+**Đáp án đúng về lý thuyết:** `ArrayList` cho phép lưu các phần tử theo thứ tự, cho phép trùng lặp và truy xuất bằng chỉ số index.
+
+**Giải thích:**
+A sai vì “duy nhất” là tính chất của `Set`.
+B sai vì “truy xuất bằng khóa” là tính chất của `Map`.
+`ArrayList` dùng chỉ số như `list.get(0)`, `list.get(1)`.
+
+---
+
+## Câu 9
+
+Cho trước đoạn chương trình sau:
+
+```java
+int x = 1, y = 6;
+
+while (y--) {
+    x++;
+}
+
+System.out.println("x = " + x + " y = " + y);
+```
+
+Kết quả sẽ là gì khi biên dịch và chạy?
+
+A) `x = 7 y = 0`
+B) `x = 6 y = 0`
+C) `x = 6 y = -1`
+D) Lỗi biên dịch
+E) `x = 7 y = -1`
+
+**Đáp án: D) Lỗi biên dịch**
+
+**Giải thích:** Trong Java, điều kiện của `while` phải là kiểu `boolean`. Biểu thức `y--` trả về kiểu `int`, nên chương trình bị lỗi biên dịch.
+
+---
+
+## Câu 10
+
+Điều gì xảy ra nếu dịch và chạy đoạn chương trình sau:
+
+```java
+import java.util.*;
+
+public class ToDo {
+    String day;
+
+    ToDo(String d) {
+        day = d;
+    }
+
+    public static void main(String[] args) {
+        Map<ToDo, String> m = new HashMap<ToDo, String>();
+
+        m.put(new ToDo("Monday"), "doLaundry");
+        m.put(new ToDo("Monday"), "payBills");
+        m.put(new ToDo("Tuesday"), "cleanAttic");
+
+        System.out.println(m.size());
+    }
+}
+```
+
+Kết quả sẽ là gì khi chạy?
+
+A) Xuất ra màn hình `3`
+B) Xuất ra màn hình `2`
+C) Lỗi biên dịch
+D) Xuất ra màn hình `1`
+
+**Đáp án: A) Xuất ra màn hình `3`**
+
+**Giải thích:** Class `ToDo` không override `equals()` và `hashCode()`. Vì vậy mỗi lần `new ToDo("Monday")` là một object khác nhau, được xem là key khác nhau trong `HashMap`.
+
+---
+
+## Câu 11
+
+Cho trước đoạn chương trình sau:
+
+```java
+int i = 1, j = -1;
+
+switch (i) {
+    case 0:
+        j = 1;
+    case 2:
+        j = 2;
+    default:
+        j = 0;
+}
+
+System.out.println("j=" + j);
+```
+
+Kết quả sẽ là gì khi biên dịch và chạy?
+
+A) `j = 1`
+B) `j = 0`
+C) Lỗi biên dịch
+D) `j = -1`
+
+**Đáp án: B) `j = 0`**
+
+**Giải thích:** `i = 1` không khớp `case 0` hoặc `case 2`, nên chạy `default`, gán `j = 0`.
+
+---
+
+## Câu 12
+
+Đoạn mã sau in gì?
+
+```java
+List<String> list = Arrays.asList("apple", "banana", "cherry");
+
+boolean result = list.stream()
+                     .anyMatch(s -> s.startsWith("a"));
+
+System.out.println(result);
+```
+
+A) Runtime exception
+B) `false`
+C) `true`
+D) Compilation error
+
+**Đáp án: C) `true`**
+
+**Giải thích:** Trong danh sách có `"apple"` bắt đầu bằng chữ `"a"`, nên `anyMatch()` trả về `true`.
+
+---
+
+## Câu 13
+
+Đoạn mã dưới sẽ in gì?
+
+```java
+ExecutorService executor = Executors.newFixedThreadPool(1);
+
+executor.shutdown();
+
+executor.execute(() -> System.out.println("Running..."));
+```
+
+A) Compilation error
+B) Không in gì
+C) In ra: `"Running..."`
+D) Runtime exception
+
+**Đáp án: D) Runtime exception**
+
+**Giải thích:** Sau khi gọi `shutdown()`, `ExecutorService` không nhận task mới nữa. Gọi `execute()` sau `shutdown()` sẽ gây lỗi runtime, thường là `RejectedExecutionException`.
+
+---
+
+## Câu 14
+
+Phương thức abstract duy nhất của `Consumer` là:
+
+A) `accept()`
+B) `test()`
+C) `apply()`
+D) `get()`
+
+**Đáp án: A) `accept()`**
+
+**Giải thích:** `Consumer<T>` là functional interface có phương thức chính là:
+
+```java
+void accept(T t);
+```
+
+---
+
+## Câu 15
+
+Cho trước đoạn chương trình sau:
+
+```java
+boolean bool = false;
+
+if (bool == true) {
+    System.out.println("a");
+} else if (bool) {
+    System.out.println("b");
+} else if (!bool) {
+    System.out.println("c");
+} else {
+    System.out.println("d");
+}
+```
+
+Kết quả sẽ là gì khi chạy?
+
+A) In ra `"a"`
+B) In ra `"b"`
+C) In ra `"c"`
+D) In ra `"d"`
+
+**Đáp án: C) In ra `"c"`**
+
+**Giải thích:** `bool = false`, nên `bool == true` sai, `bool` sai, còn `!bool` là `true`. Vì vậy chương trình in ra `"c"`.
+
+---
+
+## Câu 18
+
+Cho trước đoạn chương trình sau:
+
+```java
+int a = 9;
+int b;
+
+if (a > 3) {
+    b = 8;
+}
+
+System.out.println(b);
+```
+
+Kết quả sẽ là gì khi biên dịch và chạy chương trình?
+
+A) Xuất ra: `8`
+B) Xuất ra: `0`
+C) Lỗi khi chạy
+D) Lỗi biên dịch
+
+**Đáp án: D) Lỗi biên dịch**
+
+**Giải thích:** Biến cục bộ `b` chưa chắc chắn được gán giá trị trước khi sử dụng. Vì `if` không có `else`, compiler xem `b` có khả năng chưa được khởi tạo.
+
+---
+
+## Câu 19
+
+Cho đoạn code sau:
+
+```java
+int a = 1;
+int b = 5;
+
+loop1:
+for (; a < b--; )
+    for (; b > a++; )
+        if (a < b / 2) break;
+        else System.out.print(b + a);
+```
+
+Kết quả sẽ là gì khi chạy?
+
+A) Xuất ra màn hình `"567"`
+B) Xuất ra màn hình `"67"`
+C) Xuất ra màn hình `"6"`
+D) Xuất ra màn hình `"678"`
+E) Lỗi biên dịch
+
+**Đáp án: D) Xuất ra màn hình `"678"`**
+
+**Giải thích:** Các toán tử hậu tố `b--` và `a++` làm giá trị thay đổi sau khi so sánh. Trong các lần lặp, chương trình lần lượt in `6`, `7`, `8`.
+
+---
+
+## Câu 20
+
+Cho trước đoạn chương trình sau:
+
+```java
+public class ArrayTest {
+    public static void main(String[] args) {
+        float f1[], f2[];
+
+        f1 = new float[10];
+        f2 = f1;
+
+        System.out.println("f2[0]= " + f2[0]);
+    }
+}
+```
+
+Kết quả sẽ là gì khi chạy?
+
+A) Xuất ra màn hình `f2[0] = NaN`
+B) Xuất ra màn hình `f2[0] = 0.0`
+C) Lỗi biên dịch tại dòng 6
+D) Lỗi biên dịch tại dòng 5
+
+**Đáp án: B) Xuất ra màn hình `f2[0] = 0.0`**
+
+**Giải thích:** Mảng `float` khi mới tạo sẽ có giá trị mặc định là `0.0`. Biến `f2 = f1` nên `f2` trỏ tới cùng mảng với `f1`.
+
+---
+
+## Câu 26
+
+`Function<T, R>` có phương thức chính nào?
+
+A) `test()`
+B) `get()`
+C) `accept()`
+D) `apply()`
+
+**Đáp án: D) `apply()`**
+
+**Giải thích:** `Function<T, R>` nhận vào một giá trị kiểu `T` và trả về giá trị kiểu `R`. Phương thức abstract chính là:
+
+```java
+R apply(T t);
+```
+
+---
+
+## Câu 27
+
+Kết quả của đoạn mã sau là gì?
+
+```java
+IntStream temperatures = IntStream.of(-5, -6, -7, -5, 2, -8, -9);
+
+IntPredicate positiveTemperature = temp -> temp > 0; // #1
+
+if (temperatures.anyMatch(positiveTemperature)) { // #2
+    int temp = temperatures
+            .filter(positiveTemperature)
+            .findAny()
+            .getAsInt(); // #3
+
+    System.out.println(temp);
+}
+```
+
+A) Lỗi biên dịch tại dòng chú thích #2
+B) Khi chạy chương trình ném ra ngoại lệ `java.lang.IllegalStateException`
+C) In ra: `2`
+D) Lỗi biên dịch tại dòng chú thích #3
+E) Lỗi biên dịch tại dòng chú thích #1
+
+**Đáp án: B) Khi chạy chương trình ném ra ngoại lệ `java.lang.IllegalStateException`**
+
+**Giải thích:** `anyMatch()` là terminal operation. Sau khi gọi `anyMatch()`, stream đã bị sử dụng xong. Dùng lại `temperatures.filter(...)` sẽ gây `IllegalStateException`.
+
+---
+
+## Câu 28
+
+Cho trước đoạn chương trình sau:
+
+```java
+if ("String".trim() == "String")
+    System.out.println("Equal");
+else
+    System.out.println("Not Equal");
+```
+
+Kết quả sẽ là gì khi biên dịch và chạy chương trình?
+
+A) Không đáp án nào đúng
+B) Xuất ra: `Equal`
+C) Lỗi biên dịch
+D) Xuất ra: `Not Equal`
+
+**Đáp án: B) Xuất ra: `Equal`**
+
+**Giải thích:** Chuỗi `"String"` không có khoảng trắng ở đầu hoặc cuối, nên `trim()` trả về chính object ban đầu. Vì vậy so sánh bằng `==` cho kết quả `true`.
+
+---
+
+## Câu 29
+
+Cho trước đoạn chương trình:
+
+```java
+int[] arr = {1, 2, 3, 4, 5};
+int[] arr2 = new int[4];
+
+arr2 = arr;
+
+System.out.println(arr2[4]);
+```
+
+Kết quả sẽ là gì khi chạy?
+
+A) Lỗi khi chạy chương trình `ArrayOutOfBounds`
+B) Xuất ra màn hình: `5`
+C) Xuất ra màn hình: `4`
+D) Ảnh không thấy phương án D
+
+**Đáp án: B) Xuất ra màn hình: `5`**
+
+**Giải thích:** Sau câu lệnh `arr2 = arr`, biến `arr2` trỏ tới mảng `{1, 2, 3, 4, 5}`. Vì vậy `arr2[4]` là phần tử thứ 5, có giá trị `5`.
+
+---
+
+## Câu 30
+
+Cho trước đoạn chương trình sau:
+
+```java
+for (int i = 0; i < 5; i += 2) {
+    System.out.print(i + " ");
+}
+
+System.out.println(i);
+```
+
+Kết quả sẽ là gì khi biên dịch và chạy?
+
+A) Lỗi biên dịch
+B) Một ngoại lệ ném ra ở thời gian thực hiện chương trình
+C) `0 2 4 5`
+D) `0 2 4`
+
+**Đáp án: A) Lỗi biên dịch**
+
+**Giải thích:** Biến `i` được khai báo bên trong vòng `for`, nên chỉ có phạm vi sử dụng trong vòng `for`. Dòng `System.out.println(i);` nằm ngoài vòng `for`, nên không truy cập được biến `i`.
+
+---
+
+## Câu 31
+
+Phương thức nào trong `ExecutorService` trả về `Future`?
+
+A) `execute()`
+B) `shutdown()`
+C) `submit()`
+D) `shutdownNow()`
+
+**Đáp án: C) `submit()`**
+
+**Giải thích:** `submit()` trả về đối tượng `Future`, dùng để theo dõi kết quả của task. Còn `execute()` chỉ chạy task và không trả về kết quả.
+
+---
+
+## Câu 32
+
+Cho trước đoạn chương trình sau:
+
+```java
+public class Test {
+    public long sum(long a, long b) {
+        return a + b;
+    };
+
+    // Mã cần chèn
+}
+```
+
+Đoạn mã nào sau đây thêm vào dòng 5 mà không gây lỗi?
+
+A)
+
+```java
+public abstract int sum();
+```
+
+B)
+
+```java
+public int sum(long a, long b) {
+    return a + b;
+};
+```
+
+C)
+
+```java
+public int sum(int a, int b) {
+    return a + b;
+};
+```
+
+D) Ảnh không thấy phương án D
+
+**Đáp án: C)**
+
+```java
+public int sum(int a, int b) {
+    return a + b;
+};
+```
+
+**Giải thích:** Đây là overload hợp lệ vì danh sách tham số khác kiểu: `int, int` khác với `long, long`.
+B sai vì trùng tham số `long, long`, chỉ khác kiểu trả về nên lỗi.
+A sai vì class `Test` không phải abstract nên không thể chứa phương thức abstract.
+
+---
+
+## Câu 33
+
+Cho trước đoạn chương trình sau:
+
+```java
+String s1 = new String("hello");
+String s2 = new String("hello");
+
+System.out.print(s1 = s2);
+System.out.print(s1 == s2);
+System.out.print(s1.equals(s2));
+```
+
+Kết quả sẽ là gì khi biên dịch và chạy chương trình?
+
+A) Xuất ra `"hellotruetrue"`
+B) Xuất ra `"falsefalsetrue"`
+C) Ảnh bị cắt, không thấy phương án C
+D) Ảnh bị cắt, không thấy phương án D
+
+**Đáp án: A) Xuất ra `"hellotruetrue"`**
+
+**Giải thích:**
+`System.out.print(s1 = s2)` là phép gán, không phải phép so sánh. Nó gán `s2` cho `s1` và in ra giá trị `"hello"`.
+Sau phép gán, `s1` và `s2` cùng trỏ tới một object nên `s1 == s2` là `true`.
+`equals()` so sánh nội dung chuỗi nên cũng là `true`.
+
+---
+
+## Câu 39
+
+Khai báo nào sau đây gây lỗi biên dịch?
+
+A)
+
+```java
+String[] dogs = new String[] {
+    new String("Fido"),
+    new String("Spike"),
+    "Aiko"
+};
+```
+
+B)
+
+```java
+Integer results[] = {
+    new Integer(3),
+    6,
+    new Integer(10)
+};
+```
+
+C)
+
+```java
+String[] cats = {
+    "Fluffy",
+    "Spot",
+    "Zeus"
+};
+```
+
+D)
+
+```java
+int[] scores = {
+    3, 5, 10
+};
+```
+
+E)
+
+```java
+int[][] scores1 = {2, 4, 5}, {9, 3, 2};
+```
+
+**Đáp án: E)**
+
+```java
+int[][] scores1 = {2, 4, 5}, {9, 3, 2};
+```
+
+**Giải thích:** Mảng 2 chiều phải có cặp ngoặc `{}` bao ngoài, ví dụ:
+
+```java
+int[][] scores1 = {
+    {2, 4, 5},
+    {9, 3, 2}
+};
+```
+
+Cách viết ở đáp án E thiếu cặp ngoặc ngoài nên gây lỗi biên dịch.
+
+---
+
+## Câu 40
+
+Cho đoạn mã sau:
+
+```java
+import java.util.*;
+
+public class ToDo {
+    public static void main(String[] args) {
+        Map<String, String> m = new HashMap<String, String>();
+
+        m.put("Monday", "doLaundry");
+        m.put("Monday", "payBills");
+        m.put("Tuesday", "cleanAttic");
+
+        System.out.println(m.size());
+    }
+}
+```
+
+Kết quả sẽ là gì khi chạy?
+
+A) Xuất ra màn hình `1`
+B) Xuất ra màn hình `3`
+C) Xuất ra màn hình `2`
+D) Lỗi biên dịch
+
+**Đáp án: C) Xuất ra màn hình `2`**
+
+**Giải thích:** `HashMap` không cho trùng key. Key `"Monday"` xuất hiện 2 lần, lần sau ghi đè value của lần trước. Key còn lại là `"Tuesday"`. Vì vậy map có 2 key, nên `size()` là `2`.

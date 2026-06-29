@@ -2,33 +2,39 @@ import { useState } from "react";
 import { NavLink, Outlet, useNavigate } from "react-router-dom";
 import {
   Bell,
-  Home,
   Heart,
+  Home,
   LogIn,
   LogOut,
   Menu,
+  MessageSquare,
   Package,
   ReceiptText,
   Search,
   ShieldCheck,
   ShoppingCart,
-  MessageSquare,
   Sparkles,
   Store,
   UserRound
 } from "lucide-react";
-import { useCart } from "../state/CartContext";
 import { useAuth } from "../context/AuthContext";
+import { useCart } from "../state/CartContext";
 
 export function Layout() {
   const { cart } = useCart();
   const { user, logout } = useAuth();
   const navigate = useNavigate();
   const [keyword, setKeyword] = useState("");
+  const role = String(user?.role || "").toUpperCase();
+  const isBuyer = role === "BUYER";
+  const isSeller = role === "SELLER" && Boolean(user?.shopId);
+  const isAdmin = role === "ADMIN";
+  const canUseBuyerTools = !user || isBuyer;
+  const canUseCustomTools = isBuyer || isSeller;
 
   const handleLogout = () => {
     logout();
-    navigate('/login');
+    navigate("/login");
   };
 
   const handleSearch = (event) => {
@@ -68,29 +74,39 @@ export function Layout() {
             <NavLink to="/" end>
               <Home size={17} /> Sản phẩm
             </NavLink>
-            <NavLink to="/cart">
-              <ShoppingCart size={17} /> Giỏ hàng <span className="cart-pill">{cart.totalQuantity || 0}</span>
-            </NavLink>
+            {canUseBuyerTools && (
+              <NavLink to="/cart">
+                <ShoppingCart size={17} /> Giỏ hàng <span className="cart-pill">{cart.totalQuantity || 0}</span>
+              </NavLink>
+            )}
             {user ? (
               <>
-                <NavLink to="/wishlist">
-                  <Heart size={17} /> Wishlist
-                </NavLink>
-                <NavLink to="/chat">
-                  <MessageSquare size={17} /> Chat
-                </NavLink>
-                <NavLink to="/custom-requests">
-                  <Sparkles size={17} /> Custom
-                </NavLink>
-                <NavLink to="/orders">
-                  <ReceiptText size={17} /> Đơn mua
-                </NavLink>
-                {user.shopId && (
+                {isBuyer && (
+                  <>
+                    <NavLink to="/wishlist">
+                      <Heart size={17} /> Wishlist
+                    </NavLink>
+                    <NavLink to="/orders">
+                      <ReceiptText size={17} /> Đơn mua
+                    </NavLink>
+                  </>
+                )}
+                {canUseCustomTools && (
+                  <>
+                    <NavLink to="/chat">
+                      <MessageSquare size={17} /> Chat
+                    </NavLink>
+                    <NavLink to="/custom-requests">
+                      <Sparkles size={17} /> Custom
+                    </NavLink>
+                  </>
+                )}
+                {isSeller && (
                   <NavLink to="/seller">
                     <Store size={17} /> Kênh bán
                   </NavLink>
                 )}
-                {user.role === 'ADMIN' && (
+                {isAdmin && (
                   <NavLink to="/admin">
                     <ShieldCheck size={17} /> Admin
                   </NavLink>
@@ -101,7 +117,7 @@ export function Layout() {
                   </button>
                   <button className="user-greeting plain-user" type="button" onClick={() => navigate("/profile")}>
                     <UserRound size={15} />
-                    {user.fullName || 'User'}
+                    {user.fullName || "User"}
                   </button>
                   <button onClick={handleLogout} className="btn-logout" title="Đăng xuất">
                     <LogOut size={17} />
@@ -121,12 +137,13 @@ export function Layout() {
             <a href="/?category=Thiep%20handmade">Thiệp handmade</a>
             <a href="/?category=Qua%20tang%20custom">Quà tặng custom</a>
             <a href="/?category=Decor%20thu%20cong">Decor thủ công</a>
-            <a href="/cart">Giỏ hàng đa shop</a>
-            <a href="/orders">Theo dõi đơn</a>
-            <a href="/chat">Chat/quote</a>
-            <a href="/custom-requests">Yêu cầu custom</a>
-            <a href="/admin/manage">Quản trị</a>
-            <a href="/modules">Tất cả module</a>
+            {canUseBuyerTools && <NavLink to="/cart">Giỏ hàng đa shop</NavLink>}
+            {isBuyer && <NavLink to="/orders">Theo dõi đơn</NavLink>}
+            {canUseCustomTools && <NavLink to="/chat">Chat/quote</NavLink>}
+            {canUseCustomTools && <NavLink to="/custom-requests">Yêu cầu custom</NavLink>}
+            {isSeller && <NavLink to="/seller">Kênh bán</NavLink>}
+            {isAdmin && <NavLink to="/admin/manage">Quản trị</NavLink>}
+            {isAdmin && <NavLink to="/modules">Tất cả module</NavLink>}
           </div>
         </div>
       </header>

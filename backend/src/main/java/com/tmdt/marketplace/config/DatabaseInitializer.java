@@ -462,11 +462,19 @@ public class DatabaseInitializer implements ApplicationRunner {
                   `message_type` varchar(40),
                   `body` text,
                   `image_url` varchar(500),
+                  `attachment_url` varchar(500),
+                  `attachment_name` varchar(255),
+                  `attachment_content_type` varchar(120),
+                  `attachment_size` bigint DEFAULT 0,
                   `custom_order_id` bigint,
                   `created_at` timestamp DEFAULT CURRENT_TIMESTAMP,
                   INDEX `idx_chat_messages_conversation` (`conversation_id`)
                 )
                 """);
+        addColumnIfMissing("chat_messages", "attachment_url", "`attachment_url` varchar(500)");
+        addColumnIfMissing("chat_messages", "attachment_name", "`attachment_name` varchar(255)");
+        addColumnIfMissing("chat_messages", "attachment_content_type", "`attachment_content_type` varchar(120)");
+        addColumnIfMissing("chat_messages", "attachment_size", "`attachment_size` bigint DEFAULT 0");
         jdbcTemplate.execute("""
                 CREATE TABLE IF NOT EXISTS `custom_orders` (
                   `id` bigint PRIMARY KEY,
@@ -776,14 +784,14 @@ public class DatabaseInitializer implements ApplicationRunner {
                       `hero_url`, `about`, `materials`, `years_experience`, `verified_artisan`)
                     VALUES (?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP, ?, ?, ?, ?, true)
                     ON DUPLICATE KEY UPDATE `owner_id` = VALUES(`owner_id`), `shop_name` = VALUES(`shop_name`),
-                      `description` = VALUES(`description`), `rating` = VALUES(`rating`), `hero_url` = VALUES(`hero_url`),
+                      `logo_url` = VALUES(`logo_url`), `description` = VALUES(`description`), `rating` = VALUES(`rating`), `hero_url` = VALUES(`hero_url`),
                       `about` = VALUES(`about`), `materials` = VALUES(`materials`),
                       `years_experience` = VALUES(`years_experience`), `verified_artisan` = VALUES(`verified_artisan`)
                     """,
                     shop[0], shop[1], shop[2],
-                    "https://source.unsplash.com/240x240/?handmade,shop," + shop[0],
+                    shopLogoUrl(((Number) shop[0]).intValue()),
                     shop[3], shop[4],
-                    "https://source.unsplash.com/1400x520/?handmade,workshop," + shop[0],
+                    shopHeroUrl(((Number) shop[0]).intValue()),
                     "Xưởng " + shop[7] + " tập trung vào sản phẩm làm tay số lượng nhỏ, có thể tùy biến theo người nhận.",
                     shop[5], shop[6]);
         }
@@ -854,7 +862,7 @@ public class DatabaseInitializer implements ApplicationRunner {
                 {40, 12, 2, "Initial Jewelry Box", 890000, "Hop trang suc ca nhan hoa gom nhan bac va thiep loi chuc.", true, 4.9, "qua-tang,trang-suc,custom", 9, 2, "jewelry-gift"}
         };
         for (Object[] product : products) {
-            String imageUrl = "https://source.unsplash.com/900x700/?handmade," + product[11];
+            String imageUrl = productImageUrl((String) product[11], ((Number) product[0]).intValue());
             jdbcTemplate.update("""
                     INSERT INTO `Products` (`id`, `shop_id`, `cat_id`, `name`, `price`, `description`, `is_custom`, `avg_rating`, `status`,
                       `sku`, `tags`, `approval_status`, `main_image_url`, `options_json`, `requires_personalization`, `processing_days`)
@@ -980,6 +988,18 @@ public class DatabaseInitializer implements ApplicationRunner {
                 VALUES (1, NULL, 1, 'PLATFORM_FEE', 0, 'Demo ledger entry cho payment reliability')
                 ON DUPLICATE KEY UPDATE `note` = VALUES(`note`)
                 """);
+    }
+
+    private String productImageUrl(String slug, int productId) {
+        return "https://loremflickr.com/900/700/handmade," + slug.replace("-", ",") + "?lock=" + (1000 + productId);
+    }
+
+    private String shopLogoUrl(int shopId) {
+        return "https://loremflickr.com/240/240/handmade,craft?lock=" + (2100 + shopId);
+    }
+
+    private String shopHeroUrl(int shopId) {
+        return "https://loremflickr.com/1400/520/handmade,workshop,craft?lock=" + (2200 + shopId);
     }
 
     private void addColumnIfMissing(String tableName, String columnName, String definition) {
