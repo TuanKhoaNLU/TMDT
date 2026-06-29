@@ -46,6 +46,12 @@ public class ProductController {
         return marketplaceService.getPublicShop(tokenUserId, shopId);
     }
 
+    @GetMapping("/v1/users/me")
+    public UserProfileResponse profile(
+            @RequestAttribute(value = "userId", required = false) Long tokenUserId) {
+        return marketplaceService.getProfile(requestGuard.requireUserId(tokenUserId));
+    }
+
     @PostMapping("/v1/shops/{shopId}/follow")
     public FollowToggleResponse toggleFollowShop(
             @RequestAttribute(value = "userId", required = false) Long tokenUserId,

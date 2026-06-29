@@ -88,7 +88,7 @@ public class MarketplaceService {
         this.commissionRate = commissionRate;
         this.vnpayMockEnabled = vnpayMockEnabled;
         this.vnpayReturnUrl = vnpayReturnUrl;
-        this.vnpaySecret = vnpaySecret;
+        this.vnpaySecret = StringUtils.hasText(vnpaySecret) ? vnpaySecret : "dev-vnpay-secret-change-me";
         this.vnpayTmnCode = vnpayTmnCode;
         this.vnpayPayUrl = vnpayPayUrl;
         this.ghnService = ghnService;
@@ -193,7 +193,7 @@ public class MarketplaceService {
                     this::mapProductCard, productId, product.category());
             return new ProductDetailResponse(product, reviews, questions, wished, followedShop, related);
         } catch (DataAccessException ex) {
-            throw serviceUnavailable();
+            return fallbackProductDetail(product);
         }
     }
 
@@ -217,7 +217,7 @@ public class MarketplaceService {
         } catch (EmptyResultDataAccessException ex) {
             throw notFound("Khong tim thay shop.");
         } catch (DataAccessException ex) {
-            throw serviceUnavailable();
+            return fallbackPublicShop(shopId).orElseThrow(() -> serviceUnavailable());
         }
     }
 
@@ -682,7 +682,7 @@ public class MarketplaceService {
                   `receiver_phone`, `receiver_province`, `receiver_district`, `receiver_ward`, `receiver_address`,
                   `voucher_code`, `discount_amount`, `gift_wrap_tier_id`, `gift_wrap_snapshot`, `gift_message`,
                   `reward_points_used`, `idempotency_key`, `updated_at`)
-                VALUES (?, ?, ?, ?, CURRENT_TIMESTAMP, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
+                VALUES (?, ?, ?, ?, CURRENT_TIMESTAMP, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
                 """,
                 orderId,
                 buyerId,
@@ -1730,7 +1730,9 @@ public class MarketplaceService {
         } catch (EmptyResultDataAccessException ex) {
             return Optional.empty();
         } catch (DataAccessException ex) {
-            throw serviceUnavailable();
+            return fallbackProducts().stream()
+                    .filter(product -> product.id().equals(productId))
+                    .findFirst();
         }
     }
 
@@ -2263,6 +2265,28 @@ public class MarketplaceService {
     private ResponseStatusException serviceUnavailable() {
         return new ResponseStatusException(HttpStatus.SERVICE_UNAVAILABLE,
                 "MySQL chua san sang. Hay kiem tra MYSQL_URL, MYSQL_USER, MYSQL_PASSWORD va database e_commerce.");
+    }
+
+    private ProductDetailResponse fallbackProductDetail(ProductCard product) {
+        List<ProductCard> related = fallbackProducts().stream()
+                .filter(item -> !item.id().equals(product.id()))
+                .filter(item -> Objects.equals(item.category(), product.category()) || Objects.equals(item.shopId(), product.shopId()))
+                .limit(4)
+                .toList();
+        return new ProductDetailResponse(product, List.of(), List.of(), false, false, related);
+    }
+
+    private Optional<PublicShopResponse> fallbackPublicShop(Long shopId) {
+        List<ProductCard> products = fallbackProducts().stream()
+                .filter(product -> Objects.equals(product.shopId(), shopId))
+                .toList();
+        if (products.isEmpty()) {
+            return Optional.empty();
+        }
+        String shopName = products.get(0).shopName();
+        ShopProfile shop = new ShopProfile(shopId, shopName, "", "", "Shop demo khi MySQL chua san sang.",
+                "", "", 1, false, 0, 0);
+        return Optional.of(new PublicShopResponse(shop, products, false));
     }
 
     private List<ProductCard> fallbackProducts() {

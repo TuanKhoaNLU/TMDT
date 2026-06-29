@@ -22,13 +22,38 @@ public class DatabaseInitializer implements ApplicationRunner {
     @Override
     public void run(ApplicationArguments args) {
         try {
+            ensureDatabaseCharset();
             createBaseTables();
             addMarketplaceColumns();
             createMarketplaceTables();
+            ensureTableCharsets();
             seedDemoData();
             log.info("Marketplace MySQL schema is ready.");
         } catch (DataAccessException ex) {
             log.warn("MySQL is not ready; the app started but database APIs need MySQL. {}", ex.getMessage());
+        }
+    }
+
+    private void ensureDatabaseCharset() {
+        String databaseName = jdbcTemplate.queryForObject("SELECT DATABASE()", String.class);
+        if (databaseName != null && !databaseName.isBlank()) {
+            jdbcTemplate.execute("ALTER DATABASE `" + databaseName + "` CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci");
+        }
+    }
+
+    private void ensureTableCharsets() {
+        var tables = jdbcTemplate.queryForList("""
+                SELECT table_name
+                FROM information_schema.tables
+                WHERE table_schema = DATABASE()
+                  AND table_type = 'BASE TABLE'
+                """, String.class);
+        for (String table : tables) {
+            try {
+                jdbcTemplate.execute("ALTER TABLE `" + table.replace("`", "``") + "` CONVERT TO CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci");
+            } catch (DataAccessException ex) {
+                log.warn("Could not convert table {} to utf8mb4: {}", table, ex.getMessage());
+            }
         }
     }
 
@@ -829,7 +854,7 @@ public class DatabaseInitializer implements ApplicationRunner {
                 {40, 12, 2, "Initial Jewelry Box", 890000, "Hop trang suc ca nhan hoa gom nhan bac va thiep loi chuc.", true, 4.9, "qua-tang,trang-suc,custom", 9, 2, "jewelry-gift"}
         };
         for (Object[] product : products) {
-            String imageUrl = "https://source.unsplash.com/900x700/?handmade," + product[12];
+            String imageUrl = "https://source.unsplash.com/900x700/?handmade," + product[11];
             jdbcTemplate.update("""
                     INSERT INTO `Products` (`id`, `shop_id`, `cat_id`, `name`, `price`, `description`, `is_custom`, `avg_rating`, `status`,
                       `sku`, `tags`, `approval_status`, `main_image_url`, `options_json`, `requires_personalization`, `processing_days`)
