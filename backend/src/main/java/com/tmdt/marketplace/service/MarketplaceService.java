@@ -26,6 +26,8 @@ import java.sql.Timestamp;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
+import java.util.Collections;
+import java.util.Iterator;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
@@ -831,38 +833,79 @@ public class MarketplaceService {
 
         String transactionRef = findTransactionRef(order.id())
                 .orElseGet(() -> createPaymentTransaction(order.id(), order.total(), "VNPAY", "PENDING"));
-        Map<String, String> params = new TreeMap<>();
-        params.put("orderId", String.valueOf(order.id()));
-        params.put("vnp_Amount", order.total().multiply(BigDecimal.valueOf(100)).setScale(0, RoundingMode.HALF_UP).toPlainString());
-        params.put("vnp_OrderInfo", "Thanh toan don handmade #" + order.id());
-        params.put("vnp_PayDate", LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyyMMddHHmmss")));
-        params.put("vnp_ResponseCode", "00");
-        params.put("vnp_TmnCode", vnpayTmnCode);
-        params.put("vnp_TransactionNo", "MOCK" + order.id());
-        params.put("vnp_TxnRef", transactionRef);
 
-        String paymentUrl;
         if (vnpayMockEnabled) {
+            Map<String, String> params = new TreeMap<>();
+            params.put("orderId", String.valueOf(order.id()));
+            params.put("vnp_Amount", order.total().multiply(BigDecimal.valueOf(100)).setScale(0, RoundingMode.HALF_UP).toPlainString());
+            params.put("vnp_OrderInfo", "Thanh toan don handmade #" + order.id());
+            params.put("vnp_PayDate", LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyyMMddHHmmss")));
+            params.put("vnp_ResponseCode", "00");
+            params.put("vnp_TmnCode", vnpayTmnCode);
+            params.put("vnp_TransactionNo", "MOCK" + order.id());
+            params.put("vnp_TxnRef", transactionRef);
             params.put("mock", "true");
             params.put("vnp_SecureHash", signParams(params));
-            paymentUrl = appendQuery(vnpayReturnUrl, params);
+            String paymentUrl = appendQuery(vnpayReturnUrl, params);
+            return new PaymentCreateResponse(order.id(), paymentUrl, order.total(), "CREATED");
         } else {
-            params.remove("orderId");
-            params.remove("mock");
-            params.remove("vnp_ResponseCode");
-            params.remove("vnp_TransactionNo");
-            params.put("vnp_Command", "pay");
-            params.put("vnp_CreateDate", LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyyMMddHHmmss")));
-            params.put("vnp_CurrCode", "VND");
-            params.put("vnp_IpAddr", "127.0.0.1");
-            params.put("vnp_Locale", "vn");
-            params.put("vnp_OrderType", "other");
-            params.put("vnp_ReturnUrl", vnpayReturnUrl);
-            params.put("vnp_Version", "2.1.0");
-            params.put("vnp_SecureHash", signParams(params));
-            paymentUrl = appendQuery(vnpayPayUrl, params);
+            long amountVnpay = order.total().longValue() * 100L;
+
+            java.util.TimeZone vnTimeZone = java.util.TimeZone.getTimeZone("Asia/Ho_Chi_Minh");
+            java.text.SimpleDateFormat formatter = new java.text.SimpleDateFormat("yyyyMMddHHmmss");
+            formatter.setTimeZone(vnTimeZone);
+
+            java.util.Calendar cld = java.util.Calendar.getInstance(vnTimeZone);
+            String vnp_CreateDate = formatter.format(cld.getTime());
+
+            cld.add(java.util.Calendar.MINUTE, 15);
+            String vnp_ExpireDate = formatter.format(cld.getTime());
+
+            Map<String, String> vnp_Params = new TreeMap<>();
+            vnp_Params.put("vnp_Version", "2.1.0");
+            vnp_Params.put("vnp_Command", "pay");
+            vnp_Params.put("vnp_TmnCode", vnpayTmnCode);
+            vnp_Params.put("vnp_Amount", String.valueOf(amountVnpay));
+            vnp_Params.put("vnp_CurrCode", "VND");
+            vnp_Params.put("vnp_TxnRef", transactionRef);
+            vnp_Params.put("vnp_OrderInfo", "Thanh toan don hang " + order.id());
+            vnp_Params.put("vnp_OrderType", "other");
+            vnp_Params.put("vnp_Locale", "vn");
+            vnp_Params.put("vnp_ReturnUrl", vnpayReturnUrl);
+            vnp_Params.put("vnp_IpAddr", "127.0.0.1");
+            vnp_Params.put("vnp_CreateDate", vnp_CreateDate);
+            vnp_Params.put("vnp_ExpireDate", vnp_ExpireDate);
+
+            try {
+                StringBuilder hashData = new StringBuilder();
+                StringBuilder query = new StringBuilder();
+
+                for (Map.Entry<String, String> entry : vnp_Params.entrySet()) {
+                    String key = entry.getKey();
+                    String value = entry.getValue();
+                    if (value != null && !value.isEmpty()) {
+                        if (hashData.length() > 0) hashData.append('&');
+                        hashData.append(key).append('=')
+                                .append(URLEncoder.encode(value, StandardCharsets.US_ASCII.toString()));
+
+                        if (query.length() > 0) query.append('&');
+                        query.append(URLEncoder.encode(key, StandardCharsets.US_ASCII.toString()))
+                                .append('=')
+                                .append(URLEncoder.encode(value, StandardCharsets.US_ASCII.toString()));
+                    }
+                }
+
+                String vnp_SecureHash = hmacSha512(hashData.toString(), vnpaySecret);
+                query.append("&vnp_SecureHash=").append(vnp_SecureHash);
+
+                String paymentUrl = vnpayPayUrl + "?" + query.toString();
+                return new PaymentCreateResponse(order.id(), paymentUrl, order.total(), "CREATED");
+
+            } catch (Exception e) {
+                e.printStackTrace();
+                throw serviceUnavailable();
+            }
         }
-        return new PaymentCreateResponse(order.id(), paymentUrl, order.total(), "CREATED");
     }
 
     @Transactional
@@ -2160,24 +2203,39 @@ public class MarketplaceService {
         return hmacSha512(signingData(params), vnpaySecret);
     }
 
-    private boolean verifySecureHash(Map<String, String> params) {
-        String received = params.get("vnp_SecureHash");
-        if (!StringUtils.hasText(received)) {
+    private boolean verifySecureHash(Map<String, String> fields) {
+        Map<String, String> params = new TreeMap<>(fields);
+        String vnp_SecureHash = params.remove("vnp_SecureHash");
+        params.remove("vnp_SecureHashType");
+        
+        if (!StringUtils.hasText(vnp_SecureHash)) {
             return false;
         }
-        String expected = signParams(params);
-        return received.equalsIgnoreCase(expected);
+
+        String signValue = hmacSha512(signingData(params), vnpaySecret);
+        return vnp_SecureHash.equalsIgnoreCase(signValue);
     }
 
     private String signingData(Map<String, String> params) {
-        TreeMap<String, String> sorted = new TreeMap<>(params);
-        sorted.remove("vnp_SecureHash");
-        sorted.remove("vnp_SecureHashType");
-        return sorted.entrySet().stream()
-                .filter(entry -> StringUtils.hasText(entry.getValue()))
-                .map(entry -> urlEncode(entry.getKey()) + "=" + urlEncode(entry.getValue()))
-                .reduce((left, right) -> left + "&" + right)
-                .orElse("");
+        List<String> fieldNames = new ArrayList<>(params.keySet());
+        fieldNames.remove("vnp_SecureHash");
+        fieldNames.remove("vnp_SecureHashType");
+        Collections.sort(fieldNames);
+        StringBuilder signData = new StringBuilder();
+        Iterator<String> itr = fieldNames.iterator();
+        while (itr.hasNext()) {
+            String fieldName = itr.next();
+            String fieldValue = params.get(fieldName);
+            if ((fieldValue != null) && (fieldValue.length() > 0)) {
+                signData.append(fieldName);
+                signData.append('=');
+                signData.append(urlEncode(fieldValue));
+                if (itr.hasNext()) {
+                    signData.append('&');
+                }
+            }
+        }
+        return signData.toString();
     }
 
     private String appendQuery(String baseUrl, Map<String, String> params) {
@@ -2188,11 +2246,12 @@ public class MarketplaceService {
     private String hmacSha512(String data, String secret) {
         try {
             Mac mac = Mac.getInstance("HmacSHA512");
-            mac.init(new SecretKeySpec(secret.getBytes(StandardCharsets.UTF_8), "HmacSHA512"));
+            // Sử dụng secret.getBytes() (default charset) giống y hệt VNPayConfig mẫu
+            mac.init(new SecretKeySpec(secret.getBytes(), "HmacSHA512"));
             byte[] bytes = mac.doFinal(data.getBytes(StandardCharsets.UTF_8));
             StringBuilder result = new StringBuilder();
             for (byte b : bytes) {
-                result.append(String.format("%02x", b));
+                result.append(String.format("%02x", b & 0xff));
             }
             return result.toString();
         } catch (Exception ex) {
@@ -2225,7 +2284,11 @@ public class MarketplaceService {
     }
 
     private String urlEncode(String value) {
-        return URLEncoder.encode(value == null ? "" : value, StandardCharsets.UTF_8);
+        try {
+            return URLEncoder.encode(value == null ? "" : value, StandardCharsets.US_ASCII.toString());
+        } catch (Exception ex) {
+            return "";
+        }
     }
 
     private String toJson(Object value) {
